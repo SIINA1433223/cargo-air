@@ -1,0 +1,1712 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>航空货运查询系统</title>
+<style>
+:root{
+  --bg:#f4f6fa; --card:#ffffff; --border:#e5e9f0; --text:#1f2937; --sub:#6b7280;
+  --primary:#2563eb; --primary-weak:#eff4ff; --danger:#dc2626; --danger-weak:#fef2f2;
+  --warn:#d97706; --warn-weak:#fffbeb; --ok:#059669; --ok-weak:#ecfdf5;
+  --shadow:0 1px 3px rgba(16,24,40,.08); --radius:12px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;overflow:hidden}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+input,select{font-family:inherit;font-size:13px;color:var(--text)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:#d3dae4;border-radius:4px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ========== 整体布局 ========== */
+.app{display:flex;height:100vh}
+.sidebar{width:264px;min-width:264px;background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.content{flex:1;overflow-y:auto;padding:20px 24px}
+
+/* ========== 侧边栏 ========== */
+.logo{display:flex;align-items:center;gap:10px;padding:18px 18px 14px}
+.logo-icon{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#2563eb,#4f8ef7);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px}
+.logo-title{font-size:16px;font-weight:700}
+.logo-sub{font-size:11px;color:var(--sub);margin-top:2px}
+.side-search{padding:0 14px 10px}
+.side-search input{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;outline:none}
+.side-search input:focus{border-color:var(--primary);background:#fff}
+.side-nav{padding:0 10px}
+.side-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-radius:8px;font-size:13.5px;color:#374151;text-align:left;margin-bottom:2px}
+.side-item:hover{background:#f1f5f9}
+.side-item.active{background:var(--primary-weak);color:var(--primary);font-weight:600}
+.side-item .cnt{margin-left:auto;font-size:12px;color:var(--sub);background:#f1f5f9;border-radius:10px;padding:1px 8px}
+.side-item.active .cnt{background:#dbeafe;color:var(--primary)}
+.side-item .cnt.badge-red{background:var(--danger-weak);color:var(--danger);font-weight:600}
+.side-group-title{font-size:11px;color:#9ca3af;padding:14px 14px 6px;font-weight:600;letter-spacing:1px}
+.customer-list{flex:1;overflow-y:auto;padding:0 10px 10px}
+.cust-item{display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;border-radius:8px;font-size:13px;color:#374151;text-align:left;margin-bottom:1px}
+.cust-item:hover{background:#f1f5f9}
+.cust-item.active{background:var(--primary-weak);color:var(--primary);font-weight:600}
+.cust-item .dot{width:7px;height:7px;border-radius:50%;background:#94a3b8;flex:none}
+.cust-item.active .dot{background:var(--primary)}
+.cust-item .cnt{margin-left:auto;font-size:11.5px;color:var(--sub)}
+.cust-item .an{font-size:11px;color:var(--danger);background:var(--danger-weak);border-radius:9px;padding:0 6px;margin-left:4px;font-weight:600}
+.side-footer{border-top:1px solid var(--border);padding:12px 14px}
+.btn-feishu{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:10px;background:#3370ff;color:#fff;border-radius:9px;font-size:13px;font-weight:600}
+.btn-feishu:hover{background:#2861e0}
+.side-mode{margin-top:10px;font-size:11px;color:var(--sub);text-align:center;line-height:1.5}
+.side-mode .tag{display:inline-block;padding:1px 8px;border-radius:9px;font-weight:600}
+.tag-demo{background:#f1f5f9;color:#64748b}
+.tag-live{background:var(--ok-weak);color:var(--ok)}
+
+/* ========== 顶栏 ========== */
+.topbar{height:62px;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 24px;flex:none}
+.topbar h1{font-size:17px;font-weight:700}
+.updated{font-size:12px;color:var(--sub)}
+.top-actions{margin-left:auto;display:flex;gap:10px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:9px;font-size:13px;font-weight:500;border:1px solid var(--border);background:#fff;color:#374151}
+.btn:hover{background:#f8fafc}
+.btn-primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn-primary:hover{background:#1d4ed8}
+.btn-icon{padding:8px 10px}
+
+/* ========== 统计卡片 ========== */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:16px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);cursor:pointer;transition:transform .12s}
+.stat-card:hover{transform:translateY(-2px)}
+.stat-label{font-size:12px;color:var(--sub);display:flex;align-items:center;gap:6px}
+.stat-value{font-size:26px;font-weight:700;margin-top:6px;font-variant-numeric:tabular-nums}
+.stat-unit{font-size:12px;color:var(--sub);font-weight:400;margin-left:3px}
+.stat-card.c-blue .stat-value{color:var(--primary)}
+.stat-card.c-red .stat-value{color:var(--danger)}
+.stat-card.c-green .stat-value{color:var(--ok)}
+.stat-card.c-orange .stat-value{color:var(--warn)}
+
+/* ========== 仪表盘行 ========== */
+.dash-row{display:grid;grid-template-columns:5fr 4fr 5fr;gap:14px;margin-bottom:18px}
+@media(max-width:1200px){.dash-row{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.panel-head{display:flex;align-items:center;padding:14px 16px 10px;font-size:14px;font-weight:700}
+.panel-head .hint{font-size:11.5px;color:var(--sub);font-weight:400;margin-left:8px}
+.panel-body{padding:6px 16px 16px}
+.donut-wrap{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.donut-legend{flex:1;min-width:150px;display:flex;flex-direction:column;gap:7px}
+.legend-row{display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;padding:3px 6px;border-radius:6px}
+.legend-row:hover{background:#f1f5f9}
+.legend-row .sq{width:10px;height:10px;border-radius:3px;flex:none}
+.legend-row .nm{color:#374151}
+.legend-row .pct{margin-left:auto;color:var(--sub);font-variant-numeric:tabular-nums}
+.legend-row .n{color:#94a3b8;font-size:11.5px}
+.bar-rows{display:flex;flex-direction:column;gap:10px;padding-top:4px}
+.bar-row{font-size:12.5px}
+.bar-row .bar-top{display:flex;justify-content:space-between;margin-bottom:4px}
+.bar-row .bar-top .nm{color:#374151}
+.bar-row .bar-top .val{color:var(--sub);font-variant-numeric:tabular-nums}
+.bar-track{height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;transition:width .5s}
+.alert-list{display:flex;flex-direction:column;gap:8px;max-height:230px;overflow-y:auto}
+.alert-item{display:flex;gap:10px;align-items:flex-start;padding:9px 11px;background:var(--danger-weak);border:1px solid #fecaca;border-radius:9px;cursor:pointer}
+.alert-item:hover{background:#fee2e2}
+.alert-tag{flex:none;font-size:11px;font-weight:700;color:#fff;background:var(--danger);border-radius:6px;padding:2px 7px;margin-top:1px}
+.alert-body{min-width:0}
+.alert-title{font-size:13px;font-weight:600;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.alert-title .mawb{color:var(--danger)}
+.alert-desc{font-size:12px;color:#7f1d1d;margin-top:3px;line-height:1.5;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.alert-empty{padding:26px 0;text-align:center;color:#9ca3af;font-size:13px}
+.panel-head .mini-btn{margin-left:auto;font-size:12px;color:var(--primary);font-weight:500}
+.panel-head .mini-btn:hover{text-decoration:underline}
+
+/* ========== 工具栏 ========== */
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.search-box{position:relative;flex:1;min-width:220px;max-width:380px}
+.search-box input{width:100%;padding:9px 12px 9px 34px;border:1px solid var(--border);border-radius:9px;background:#fff;outline:none}
+.search-box input:focus{border-color:var(--primary)}
+.search-box .ico{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:#9ca3af;font-size:14px}
+.toolbar select{padding:9px 10px;border:1px solid var(--border);border-radius:9px;background:#fff;outline:none;max-width:160px}
+.chk{display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;user-select:none;cursor:pointer;background:#fff;border:1px solid var(--border);border-radius:9px;padding:9px 12px}
+.chk input{accent-color:var(--danger);cursor:pointer}
+.result-info{font-size:12px;color:var(--sub)}
+
+/* ========== 数据表 ========== */
+.table-panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+table{width:100%;border-collapse:collapse}
+thead th{font-size:12px;color:var(--sub);font-weight:600;text-align:left;padding:11px 14px;background:#f8fafc;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
+thead th:hover{color:var(--primary)}
+thead th.no-sort{cursor:default}
+thead th.no-sort:hover{color:var(--sub)}
+tbody td{padding:11px 14px;border-bottom:1px solid #f1f4f8;font-size:13px;white-space:nowrap}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:#f8faff}
+tbody tr.has-anomaly{background:linear-gradient(90deg,var(--danger-weak),transparent 55%)}
+tbody tr.has-anomaly:hover{background:#fee9e9}
+.mawb-cell{font-family:Consolas,Menlo,monospace;font-weight:600;color:var(--primary)}
+.pill{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 10px;border-radius:10px;line-height:1.6}
+.type-pill{background:#f1f5f9;color:#475569}
+.anomaly-text{color:var(--danger);font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+.empty-state{padding:60px 20px;text-align:center;color:#9ca3af}
+.empty-state .big{font-size:34px;margin-bottom:10px}
+.pager{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 14px;font-size:12.5px;color:var(--sub)}
+.pager button{padding:5px 11px;border:1px solid var(--border);border-radius:7px;background:#fff;font-size:12.5px;color:#374151}
+.pager button:disabled{opacity:.4;cursor:default}
+.pager button:not(:disabled):hover{background:#f1f5f9}
+
+/* ========== 客户页下拉航班详情 ========== */
+tbody tr.customer-row{cursor:pointer;transition:background .12s}
+tbody tr.customer-row:hover{background:#f0f6ff}
+tbody tr.customer-row.expanded{background:#f8fbff}
+tbody tr.customer-row.expanded td{border-bottom:none}
+.flight-drop td{padding:0;border-bottom:1px solid var(--border);background:#fff}
+.flight-drop-inner{padding:18px 24px 22px;margin:0 0 0;background:#f8fafc;border-left:3px solid var(--primary);animation:slideDown .2s ease}
+@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.flight-drop h4{font-size:13px;font-weight:700;color:#1f2937;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.flight-drop .summary-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px}
+.flight-drop .summary-item{background:#fff;border:1px solid var(--border);border-radius:9px;padding:10px 12px}
+.flight-drop .summary-item .k{font-size:11.5px;color:var(--sub);margin-bottom:4px}
+.flight-drop .summary-item .v{font-size:13.5px;font-weight:600;color:#1f2937}
+.flight-table{width:100%;border-collapse:collapse;margin-bottom:16px;background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.flight-table th{background:#f1f5f9;font-size:11.5px;color:var(--sub);font-weight:600;text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap}
+.flight-table td{font-size:12.5px;padding:9px 12px;border-bottom:1px solid #f1f4f8;color:#374151;white-space:nowrap}
+.flight-table tr:last-child td{border-bottom:none}
+.flight-table .leg{font-weight:600;color:var(--primary)}
+.flight-raw{background:#fff;border:1px solid var(--border);border-radius:9px;padding:12px;font-size:12px;line-height:1.7;color:#475569;white-space:pre-wrap;max-height:220px;overflow-y:auto}
+.flight-alert{display:flex;gap:8px;align-items:flex-start;background:var(--danger-weak);border:1px solid #fecaca;border-radius:9px;padding:10px 12px;margin-bottom:14px;color:#991b1b;font-size:12.5px}
+.flight-alert svg,.flight-alert .ico{flex:none;margin-top:1px}
+.warn-icon{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#dc2626;color:#fff;font-size:12px;font-weight:700;margin-right:4px;cursor:help;position:relative;vertical-align:middle;line-height:1}
+.warn-icon:hover{background:#b91c1c}
+/* 悬浮提示统一改到元素右侧，避免被上方文字遮挡 */
+.warn-icon .tip{position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:7px;background:#1f2937;color:#fff;font-size:12px;font-weight:400;padding:7px 10px;border-radius:7px;white-space:nowrap;z-index:100;display:none;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.warn-icon .tip::after{content:"";position:absolute;right:100%;top:50%;margin-top:-5px;border:5px solid transparent;border-right-color:#1f2937}
+.warn-icon:hover .tip,td:hover>.warn-icon .tip,tr.customer-row:hover .warn-icon .tip{display:block}
+.flight-drop .warn-icon .tip{white-space:normal;width:max-content;max-width:260px;text-align:left}
+.trk-list{background:#fff;border:1px solid var(--border);border-radius:9px;padding:4px 12px;margin-bottom:4px}
+.trk-row{display:flex;gap:12px;padding:7px 4px;border-bottom:1px dashed #eef1f5;font-size:12.5px;line-height:1.5}
+.trk-row:last-child{border-bottom:none}
+.trk-k{flex:none;width:62px;color:var(--sub);font-weight:600;text-align:right;white-space:nowrap}
+.trk-v{flex:1;color:#374151;word-break:break-all}
+.trk-empty{color:#9ca3af;font-size:13px;padding:8px 2px}
+
+/* ========== 详情抽屉 ========== */
+.drawer-mask{position:fixed;inset:0;background:rgba(15,23,42,.35);z-index:50;display:none}
+.drawer-mask.show{display:block}
+.drawer{position:fixed;top:0;right:-460px;width:450px;height:100vh;background:#fff;z-index:51;box-shadow:-8px 0 30px rgba(15,23,42,.15);transition:right .25s ease;display:flex;flex-direction:column}
+.drawer.show{right:0}
+.drawer-head{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:10px}
+.drawer-head h3{font-size:16px;font-weight:700}
+.drawer-close{margin-left:auto;font-size:20px;color:#9ca3af;line-height:1;padding:2px 6px;border-radius:6px}
+.drawer-close:hover{background:#f1f5f9;color:var(--text)}
+.drawer-body{flex:1;overflow-y:auto;padding:14px 20px 20px}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.detail-item{padding:10px 4px;border-bottom:1px dashed #eef1f5}
+.detail-item.full{grid-column:1/-1}
+.detail-item .k{font-size:11.5px;color:var(--sub);margin-bottom:3px}
+.detail-item .v{font-size:13.5px;font-weight:500;word-break:break-all}
+.drawer-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px}
+.drawer-foot .btn{flex:1;justify-content:center}
+.edit-head{font-size:13px;font-weight:700;color:#1f2937;margin-bottom:12px}
+.edit-row{margin-bottom:10px}
+.edit-row label{display:block;font-size:11.5px;font-weight:600;color:#6b7280;margin-bottom:5px}
+.edit-row input{width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none;background:#f8fafc}
+.edit-row input:focus{border-color:var(--primary);background:#fff}
+.edit-row textarea{width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none;background:#f8fafc;resize:vertical;line-height:1.5}
+.edit-row textarea:focus{border-color:var(--primary);background:#fff}
+
+/* 客户页单条展开面板 */
+.customer-expand{padding-bottom:4px}
+.expand-section{margin-top:18px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 16px 16px}
+.expand-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.expand-head h4{margin:0}
+.expand-grid{grid-template-columns:repeat(3,1fr);gap:10px 14px}
+@media(max-width:1200px){.expand-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:800px){.expand-grid{grid-template-columns:1fr}}
+.history-list .trk-row{padding:8px 4px}
+.history-list .trk-v{text-align:left;word-break:break-word;color:#374151}
+.edit-section{background:#f8fafc}
+.edit-section h4{margin-bottom:14px}
+
+/* 手写格式：运单详情面板 */
+.customer-detail{padding:14px 16px 16px}
+.detail-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.detail-head h4{margin:0;font-size:15px}
+.detail-body{border:1px solid var(--border);border-radius:9px;background:#fff}
+.detail-row{display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:1px dashed #e2e8f0}
+.detail-row:last-child{border-bottom:none}
+.detail-cell{padding:11px 14px;min-height:56px;display:flex;flex-direction:column;justify-content:center;gap:4px}
+.detail-cell:first-child{border-right:1px dashed #e2e8f0}
+.detail-cell .k{font-size:11.5px;color:var(--sub);font-weight:600;display:flex;align-items:center;gap:6px}
+.detail-cell .v{font-size:13.5px;font-weight:500;word-break:break-all;min-height:18px}
+.detail-cell .k .warn-icon{width:15px;height:15px;font-size:10px}
+.detail-cell input{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#f8fafc;outline:none}
+.detail-cell input:focus{border-color:var(--primary);background:#fff}
+.detail-cell input:disabled{background:#e2e8f0;color:#6b7280;cursor:not-allowed}
+.edit-mode .detail-body{background:#f8fafc}
+.edit-mode .detail-cell{background:#fff}
+.has-tip{position:relative;display:inline-block;width:fit-content;cursor:help}
+/* 主单号悬浮提示也改到右侧，避免被遮挡 */
+.has-tip .tip{position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:8px;background:#1f2937;color:#fff;font-size:12px;padding:7px 11px;border-radius:7px;white-space:nowrap;z-index:100;display:none;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.has-tip .tip::after{content:"";position:absolute;right:100%;top:50%;margin-top:-5px;border:5px solid transparent;border-right-color:#1f2937}
+.has-tip:hover .tip{display:block}
+@media(max-width:800px){
+  .detail-row{grid-template-columns:1fr}
+  .detail-cell:first-child{border-right:none;border-bottom:1px dashed #e2e8f0}
+  .detail-row:last-child .detail-cell:last-child{border-bottom:none}
+}
+.modal-mask{position:fixed;inset:0;background:rgba(15,23,42,.4);z-index:60;display:none;align-items:center;justify-content:center}
+.modal-mask.show{display:flex}
+.modal{width:640px;max-width:94vw;max-height:88vh;background:#fff;border-radius:14px;display:flex;flex-direction:column;overflow:hidden}
+.modal-head{padding:18px 22px 0;display:flex;align-items:center}
+.modal-head h3{font-size:16px;font-weight:700}
+.modal-close{margin-left:auto;font-size:20px;color:#9ca3af;padding:2px 8px;border-radius:6px}
+.modal-close:hover{background:#f1f5f9;color:var(--text)}
+.modal-tabs{display:flex;gap:4px;padding:14px 22px 0;border-bottom:1px solid var(--border)}
+.modal-tab{padding:8px 14px;font-size:13.5px;color:var(--sub);border-radius:8px 8px 0 0;font-weight:500}
+.modal-tab.active{color:var(--primary);font-weight:700;box-shadow:inset 0 -2px 0 var(--primary)}
+.modal-tab:hover{color:var(--primary)}
+.modal-body{overflow-y:auto;padding:18px 22px}
+.modal-foot{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+.form-row{margin-bottom:14px}
+.form-row label{display:block;font-size:12.5px;font-weight:600;color:#374151;margin-bottom:6px}
+.form-row input,.form-row select{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;outline:none}
+.form-row input:focus,.form-row select:focus{border-color:var(--primary)}
+.form-row .desc{font-size:11.5px;color:var(--sub);margin-top:5px;line-height:1.6}
+.mode-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.mode-card{border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;cursor:pointer}
+.mode-card.active{border-color:var(--primary);background:var(--primary-weak)}
+.mode-card .t{font-weight:700;font-size:13.5px;display:flex;align-items:center;gap:6px}
+.mode-card .d{font-size:11.5px;color:var(--sub);margin-top:4px;line-height:1.5}
+.help-steps{font-size:13px;line-height:1.9;color:#374151}
+.help-steps b{color:var(--text)}
+.help-steps .num{display:inline-flex;width:20px;height:20px;background:var(--primary);color:#fff;border-radius:50%;align-items:center;justify-content:center;font-size:11px;margin-right:6px;flex:none}
+.help-block{background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin:10px 0}
+.help-warn{background:var(--warn-weak);border-color:#fde68a;color:#92400e}
+.help-code{font-family:Consolas,monospace;background:#eef2f7;padding:1px 6px;border-radius:4px;font-size:12px}
+.map-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+.map-item label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px}
+.map-item select{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px}
+.conn-status{font-size:12.5px;padding:10px 12px;border-radius:8px;line-height:1.7}
+.conn-ok{background:var(--ok-weak);color:#065f46}
+.conn-err{background:var(--danger-weak);color:#991b1b}
+.conn-info{background:var(--primary-weak);color:#1e40af}
+
+/* ========== Toast ========== */
+.toast{position:fixed;top:18px;left:50%;transform:translateX(-50%) translateY(-70px);background:#1f2937;color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;z-index:99;transition:transform .3s;box-shadow:0 6px 20px rgba(0,0,0,.2);max-width:80vw}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.err{background:var(--danger)}
+.toast.ok{background:var(--ok)}
+
+.loading-bar{height:3px;background:linear-gradient(90deg,#2563eb,#93c5fd);background-size:200% 100%;animation:slide 1.2s infinite;position:fixed;top:0;left:0;right:0;z-index:100;display:none}
+.loading-bar.show{display:block}
+@keyframes slide{0%{background-position:200% 0}100%{background-position:-200% 0}}
+/* ========== 登录弹窗 ========== */
+.login-mask{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;z-index:9999}
+.login-mask.show{display:flex}
+.login-card{width:340px;background:#fff;border-radius:16px;padding:30px 26px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.login-logo{width:54px;height:54px;border-radius:14px;background:linear-gradient(135deg,#2563eb,#4f8ef7);color:#fff;font-size:28px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
+.login-title{font-size:19px;font-weight:700}
+.login-sub{font-size:13px;color:#6b7280;margin:6px 0 18px}
+.login-input{width:100%;padding:11px 13px;border:1px solid #e5e9f0;border-radius:10px;margin-bottom:10px;font-size:14px;outline:none}
+.login-input:focus{border-color:#2563eb;background:#fbfdff}
+.login-err{color:#dc2626;font-size:12.5px;min-height:18px;margin-bottom:6px}
+.login-btn{width:100%;padding:11px;border-radius:10px;background:#2563eb;color:#fff;font-size:15px;font-weight:600;margin-top:4px}
+.login-btn:hover{background:#1d4ed8}
+.login-foot{font-size:11.5px;color:#9ca3af;margin-top:14px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="loading-bar" id="loadingBar"></div>
+<div class="app">
+  <!-- ===== 侧边栏 ===== -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">✈</div>
+      <div>
+        <div class="logo-title">航空货运查询系统</div>
+        <div class="logo-sub">数据承载：飞书多维表格</div>
+      </div>
+    </div>
+    <div class="side-search">
+      <input id="custSearch" type="text" placeholder="🔍 搜索客户名称…" oninput="renderSidebar()">
+    </div>
+    <nav class="side-nav">
+      <button class="side-item active" id="navAll" onclick="selectCustomer(null)">
+        <span>📦</span><span>全部货物</span><span class="cnt" id="cntAll">0</span>
+      </button>
+      <button class="side-item" id="navAnomaly" onclick="toggleAnomalyOnly()">
+        <span>🚨</span><span>只看异常</span><span class="cnt badge-red" id="cntAnomaly">0</span>
+      </button>
+    </nav>
+    <div class="side-group-title">客户分组</div>
+    <div class="customer-list" id="customerList"></div>
+    <div class="side-footer">
+      <button class="btn-feishu" onclick="openFeishu()">✈️ 一键打开飞书表格 · 上传主单号</button>
+      <div class="side-mode" id="modeLabel"></div>
+    </div>
+  </aside>
+
+  <!-- ===== 主区域 ===== -->
+  <div class="main">
+    <header class="topbar">
+      <h1 id="pageTitle">货物总览</h1>
+      <span class="updated" id="updatedInfo"></span>
+      <div class="top-actions">
+        <button class="btn" onclick="loadData(true)">⟳ 刷新数据</button>
+        <button class="btn btn-primary" onclick="openFeishu()">＋ 上传主单号</button>
+        <button class="btn btn-icon" title="设置" onclick="openSettings()">⚙</button>
+        <button class="btn btn-icon" id="logoutBtn" title="退出登录" onclick="logout()" style="display:none">🚪</button>
+      </div>
+    </header>
+
+    <div class="content">
+      <div id="dashboardZone">
+      <!-- 统计卡片 -->
+      <div class="stats">
+        <div class="stat-card c-blue" onclick="clearAllFilters()">
+          <div class="stat-label">📦 货物总票数</div>
+          <div class="stat-value" id="stTotal">0<span class="stat-unit">票</span></div>
+        </div>
+        <div class="stat-card c-orange" onclick="clearAllFilters()">
+          <div class="stat-label">🧳 总件数</div>
+          <div class="stat-value" id="stPieces">0<span class="stat-unit">件</span></div>
+        </div>
+        <div class="stat-card c-green" onclick="clearAllFilters()">
+          <div class="stat-label">⚖️ 总重量</div>
+          <div class="stat-value" id="stWeight">0<span class="stat-unit">KG</span></div>
+        </div>
+        <div class="stat-card c-red" onclick="toggleAnomalyOnly()">
+          <div class="stat-label">🚨 异常票数</div>
+          <div class="stat-value" id="stAnomaly">0<span class="stat-unit">票</span></div>
+        </div>
+      </div>
+
+      <!-- 仪表盘 -->
+      <div class="dash-row">
+        <div class="panel">
+          <div class="panel-head">查询状态占比<span class="hint">点击图例可按状态筛选</span></div>
+          <div class="panel-body">
+            <div class="donut-wrap">
+              <svg id="donutSvg" width="190" height="190" viewBox="0 0 190 190"></svg>
+              <div class="donut-legend" id="donutLegend"></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">客户运量排行<span class="hint">按票数统计，点击查看该客户</span></div>
+          <div class="panel-body"><div class="bar-rows" id="customerRank"></div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">🚨 异常情况提醒
+            <span class="hint">判定：查询不到 / deadline延迟 / 已飞未起飞</span>
+            <button class="mini-btn" onclick="viewAllAnomalies()">查看全部 →</button>
+          </div>
+          <div class="panel-body"><div class="alert-list" id="alertList"></div></div>
+        </div>
+      </div>
+      </div><!-- /dashboardZone -->
+
+      <!-- 筛选工具栏 -->
+      <div class="toolbar">
+        <div class="search-box">
+          <span class="ico">🔍</span>
+          <input id="globalSearch" type="text" placeholder="搜索主单号 / 航班号 / 目的港 / 备注…" oninput="renderTable()">
+        </div>
+        <select id="filterType" onchange="renderTable()"><option value="">全部货类</option></select>
+        <select id="filterStatus" onchange="renderTable()"><option value="">全部状态</option></select>
+        <select id="filterDate" onchange="renderTable()">
+          <option value="">全部日期</option>
+          <option value="today">今天</option>
+          <option value="3d">近3天</option>
+          <option value="7d">近7天</option>
+          <option value="past">已过期</option>
+        </select>
+        <label class="chk"><input type="checkbox" id="chkAnomaly" onchange="renderTable()"> 只看异常</label>
+        <span class="result-info" id="resultInfo"></span>
+      </div>
+
+      <!-- 货物总览表格 -->
+      <div class="table-panel">
+        <div style="overflow-x:auto">
+          <table>
+            <thead id="tableHead"></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+        <div class="pager" id="pager"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 详情抽屉 ===== -->
+<div class="drawer-mask" id="drawerMask" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div>
+      <h3 id="drawerTitle">货件详情</h3>
+      <div class="updated" id="drawerSub"></div>
+    </div>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="detail-grid" id="detailGrid"></div>
+    <div id="editArea" style="display:none"></div>
+  </div>
+  <div class="drawer-foot">
+    <button class="btn" onclick="openFeishu()">✈️ 去飞书表格处理</button>
+    <button class="btn" id="editBtn" onclick="enterEdit()">✎ 编辑并同步</button>
+    <button class="btn btn-primary" onclick="closeDrawer()">关闭</button>
+  </div>
+</div>
+
+<!-- ===== 设置弹窗 ===== -->
+<div class="modal-mask" id="settingsMask">
+  <div class="modal">
+    <div class="modal-head"><h3>⚙ 系统设置</h3><button class="modal-close" onclick="closeSettings()">✕</button></div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" onclick="switchTab(0)">数据源</button>
+      <button class="modal-tab" onclick="switchTab(1)">字段映射</button>
+      <button class="modal-tab" onclick="switchTab(2)">连接教程</button>
+    </div>
+    <div class="modal-body" id="tabBody"></div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeSettings()">取消</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveConfig()">保存并测试连接</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================
+   配置
+===================================================== */
+const FEISHU_URL = "https://lxtkkuupzkq.feishu.cn/base/JrEmbA3QTataXcsw4mAc2svSnFd?table=tblnqJv9sVubmZoM&view=vewTrVS6cS";
+const API_BASE = "";   // 同源代理（由 server.py 提供）；file:// 直开时自动降级演示数据
+
+/* ===== 网站登录鉴权 ===== */
+const TOKEN_KEY = "hhq_token";
+let loginModalOpen = false;
+let appStarted = false;
+function getToken(){ return localStorage.getItem(TOKEN_KEY) || ""; }
+function setToken(t){ if(t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY); }
+function authHeaders(){ const t = getToken(); return t ? {"Authorization": "Bearer " + t} : {}; }
+async function apiFetch(url, opts={}){
+  opts.headers = Object.assign({}, opts.headers, authHeaders());
+  const r = await fetch(url, opts);
+  if(r.status === 401){ showLogin(); throw new Error("AUTH_REQUIRED"); }
+  return r;
+}
+function showLogin(){
+  loginModalOpen = true;
+  const m = document.getElementById("loginMask"); if(m) m.classList.add("show");
+  const err = document.getElementById("loginErr"); if(err) err.textContent = "";
+  setTimeout(()=>{ const u=document.getElementById("loginUser"); if(u) u.focus(); }, 60);
+}
+function hideLogin(){ loginModalOpen = false; const m=document.getElementById("loginMask"); if(m) m.classList.remove("show"); }
+async function doLogin(){
+  const user = (document.getElementById("loginUser")?.value || "").trim() || "admin";
+  const pass = document.getElementById("loginPass")?.value || "";
+  const err = document.getElementById("loginErr"); if(err) err.textContent = "";
+  try{
+    const r = await fetch(API_BASE + "/api/login", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({user, pass})});
+    const j = await r.json();
+    if(j.ok){ setToken(j.token); hideLogin(); updateLogoutBtn(); startApp(); }
+    else if(err) err.textContent = j.msg || "登录失败，请重试";
+  }catch(e){ if(err) err.textContent = "网络错误，请稍后重试"; }
+}
+function logout(){ setToken(""); updateLogoutBtn(); showLogin(); }
+function updateLogoutBtn(){ const b=document.getElementById("logoutBtn"); if(b) b.style.display = getToken() ? "" : "none"; }
+function startApp(){
+  loadData();
+  if(!appStarted){ setInterval(autoRefresh, 30000); appStarted = true; }
+}
+async function boot(){
+  // 先问后端是否需要登录；本地双击 index.html（无后端）则直接走演示数据
+  try{
+    const r = await fetch(API_BASE + "/api/status");
+    const j = await r.json();
+    if(j.auth_required && !getToken()){ showLogin(); }
+    else { updateLogoutBtn(); startApp(); }
+  }catch(e){ updateLogoutBtn(); startApp(); }
+}
+
+/* 系统识别的业务字段（角色），kw 为自动匹配关键词 */
+const ROLES = [
+  {key:"mawb",      label:"主单号",    kw:["主单号","运单号","提单号","mawb","awb","总单"]},
+  {key:"customer",  label:"客户名称",  kw:["客户","customer","货主","委托方"]},
+  {key:"cargoType", label:"货类",      kw:["货类","货物类型","品类","货物名称","货品","品名","货物"]},
+  {key:"flight",    label:"航班号",    kw:["航班号","航班","flight","舱位"]},
+  {key:"flightDate",label:"ETD",      kw:["etd","航班日期","起飞时间","起飞日期","航班时间","日期","时间","计划"]},
+  {key:"origin",    label:"始发港",    kw:["始发","起运","出发港","origin","启运"]},
+  {key:"dest",      label:"目的港",    kw:["目的","到达港","到达","dest","抵达"]},
+  {key:"pieces",    label:"件数",      kw:["件数","pcs","packages","板件","箱数"]},
+  {key:"weight",    label:"重量(KG)",  kw:["重量","毛重","公斤","weight","计费重量"]},
+  {key:"queryStatus",label:"查询状态",  kw:["查询状态"]},
+  {key:"vf",        label:"飞常准",    kw:["飞常准","variflight","航班动态"]},
+  {key:"agentDeadline", label:"代理deadline", kw:["代理deadline","代理 deadline"]},
+  {key:"deadline",  label:"deadline校验", kw:["deadline校验","deadline校验结果"]},
+  {key:"etd",       label:"ETD",       kw:["etd","预计起飞","计划起飞","起飞时间"]},
+  {key:"atd",       label:"ATD",       kw:["atd","实际起飞","实际离港","离港时间"]},
+  {key:"eta",       label:"ETA",       kw:["eta","预计到达","预计到港"]},
+  {key:"ata",       label:"ATA",       kw:["ata","实际到达","实际到港"]},
+  {key:"secondEtd", label:"二程ETD",   kw:["二程etd","二程预计起飞"]},
+  {key:"secondAtd", label:"二程ATD",   kw:["二程atd","二程实际起飞"]},
+  {key:"secondEta", label:"二程ETA",   kw:["二程eta","二程预计到达"]},
+  {key:"secondAta", label:"二程ATA",   kw:["二程ata","二程实际到达"]},
+  {key:"flightInfo",label:"航班信息",  kw:["航班信息","tracking","航司信息"]},
+  {key:"flightInfo2",label:"航班信息2",kw:["航班信息2","二程信息"]},
+  {key:"status",    label:"状态",      kw:["状态","status","进度","环节"]},
+  {key:"isSplit",   label:"是否分批",  kw:["是否分批","分批","split","partial"]},
+  {key:"isTransfer",label:"是否转运",  kw:["是否转运","是否转货","转运","转货","transfer","transit"]},
+  {key:"anomaly",   label:"异常情况",  kw:["异常","exception","风险","问题","备注异常"]},
+  {key:"remark",    label:"备注",      kw:["备注","remark","说明","留言"]}
+];
+const TYPE_COLORS = ["#2563eb","#059669","#d97706","#dc2626","#7c3aed","#0891b2","#db2777","#65a30d","#9333ea","#475569"];
+const STATUS_STYLE = {
+  "待订舱":{bg:"#f1f5f9",fg:"#475569"},"已订舱":{bg:"#dbeafe",fg:"#1d4ed8"},"已起飞":{bg:"#cffafe",fg:"#0e7490"},
+  "运输中":{bg:"#e0e7ff",fg:"#4338ca"},"已到达":{bg:"#ccfbf1",fg:"#0f766e"},"已提取":{bg:"#d1fae5",fg:"#047857"},
+  "已完成":{bg:"#e5e7eb",fg:"#374151"},"异常":{bg:"#fee2e2",fg:"#b91c1c"},"退运":{bg:"#fee2e2",fg:"#b91c1c"}
+};
+const ANOMALY_WORDS = ["异常","延误","滞留","退运","取消","缺","不符","报警","超重","受损","丢失","扣货","罢工"];
+/* 查询状态配色（参考飞书多维表格单选标签样式，中英双语关键词） */
+const QS_STYLE = [
+  {kw:["not found","查询不到","异常","退运","取消"],  bg:"#ffe0e0", fg:"#c03434"},
+  {kw:["tracking"],                                bg:"#ffedd5", fg:"#c2410c"},
+  {kw:["延迟"],                                    bg:"#ffe8c8", fg:"#a35b00"},
+  {kw:["booked","未起飞","待起飞","计划","未起"],    bg:"#fff3c2", fg:"#8f6400"},
+  {kw:["in transit","已飞","已起飞","运输"],         bg:"#d6e4ff", fg:"#2359c9"},
+  {kw:["arrived","到达","抵达","降落"],             bg:"#c9f0ee", fg:"#0a7f7a"},
+  {kw:["delivered","提取","完成","签收"],           bg:"#d3f0d3", fg:"#0e7a30"}
+];
+/* 判断"实际已起飞"的关键词（飞常准显示已飞、但查询状态不含这些词 => 异常）
+   中英双语；不能用"起飞"做关键词，否则"未起飞"会被误判为已飞 */
+const FLOWN_WORDS = ["in transit","arrived","delivered","已飞","已起飞","运输","到达","抵达","提取","完成","降落"];
+
+/* =====================================================
+   全局状态
+===================================================== */
+let DATA = { mode:"demo", updated_at:null, fields:[], records:[] };
+let MAPPING = {};                  // role -> 字段名
+let selCustomer = null;
+let curPage = 1, sortKey = "flightDate", sortDir = -1;
+let drawerRecord = null;
+let expandedId = null;
+let inlineEditingId = null;
+
+/* =====================================================
+   演示数据（字段名刻意贴近真实货代表格，验证自动映射）
+===================================================== */
+function dt(offset,h){ const t=new Date(); t.setDate(t.getDate()+offset); const p=n=>String(n).padStart(2,"0"); return t.getFullYear()+"-"+p(t.getMonth()+1)+"-"+p(t.getDate())+" "+h; }
+const DEMO_ROWS = [
+  // 0主单号 1客户 2查询状态 3航班号 4飞常准 5deadline校验 6ETD 7ATD 8ETA 9ATA 10启运港 11目的港 12是否转运 13是否分批 14冲突备注 15航班信息 16航班信息2 17AI分析
+  ["020-50673674","豪迈","delivered","CA1049","（航班已飞 ATD=2026-08-19 09:06，无需飞常准查询）","无deadline信息，不做比对",dt(-2,"09:06"),dt(-2,"09:06"),dt(0,"20:30"),dt(-1,"19:30"),"PEK (Beijing)","OPO (Porto)","否","否","","020-50673674\nNot Found\nAirline\nLufthansa Cargo\nNetwork error, please try again later.","","运单号：020-50673674\n航线：PEK-OPO\n头程ETD：2026-08-19 09:06\n头程ATD：2026-08-19 09:06\n头程ETA：2026-08-20 20:30\n头程ATA：2026-08-20 19:30\ndeadline校验结果：无deadline信息"],
+  ["999-94797113","海信","in transit","CA1049","（航班已飞 ATD=2026-08-21 13:40，无需飞常准查询）","无deadline信息，不做比对",dt(0,"13:40"),dt(0,"13:40"),dt(1,"20:29"),"","PVG (Shanghai)","JFK (New York City)","否","否","","999-94797113\nPick Up Notified\nDeparture time\nATD 2026-08-21 13:40\nTotal piece / Weight: 4 pcs / 1783.0 K","","运单号：999-94797113\n航线：PVG-JFK\n头程ATD：2026-08-21 13:40\n头程ATA：2026-08-21 20:29\n航班状态：arrived"],
+  ["020-25307166","超达","booked","MU583","（未到 ETD（2026-08-22 08:20），航班未起飞，暂无需飞常准查询）","无deadline信息，不做比对",dt(1,"08:20"),"","2026-08-24 14:15","","PVG","FRA","否","否","","020-25307166\nStatus: Booked\nRoute: PVG → FRA\nFlight No.: MU583","","运单号：020-25307166\n航线：PVG-FRA\n头程ETD：2026-08-22 08:20\n航班状态：booked"],
+  ["131-05708640","德诚宝","Not Found","TK6317","飞常准查询（TK6317 / 2026-08-21）：未找到该航班（飞常准暂无数据，请确认航班号与日期）","无deadline信息，不做比对","","","","","IST","PRG","否","否","航司系统Network error，未获取到航线信息","131-05708640\nNot Found\nNetwork error, please try again later.","","运单号：131-05708640\n查询状态：Not Found\n飞常准：未找到该航班"],
+  ["112-09848403","银宝山新","arrived","CZ327","（航班已飞 ATD=2026-08-18 06:00，无需飞常准查询）","无deadline信息，不做比对",dt(-3,"06:00"),dt(-3,"06:00"),dt(-2,"17:30"),dt(-2,"16:45"),"SZX","ICN","否","否","","112-09848403\nRCS Shipment Accepted\nDEP Shipment Departed\nRCF Shipment Received From Flight\nStatus: Arrived","","运单号：112-09848403\n航线：SZX-ICN\n头程ATD：2026-08-18 06:00\n头程ATA：2026-08-18 16:45"],
+  ["131-05743592","海泰科","Not Found","","（无航班号，跳过飞常准查询）","无deadline信息，不做比对","","","","","","","否","否","运单缺少航班号","131-05743592\nStatus: Not Found\n无航班号，跳过飞常准查询","","运单号：131-05743592\n查询状态：Not Found\n冲突备注：运单缺少航班号"],
+  ["235-96777855","中誉","in transit","5Y872","（航班已飞 ATD=2026-08-21 05:33，无需飞常准查询）","无deadline信息，不做比对",dt(0,"05:33"),dt(0,"05:33"),dt(1,"18:10"),"","CAN","LAX","否","否","","235-96777855\nStatus: In Transit\nRoute: CGO (Zhengzhou) → PRG (Prague)\nFlight No.: 头程 TK6211 / 二程 TK6509\nDEP 2026-08-19 09:06 CGO TK6211","","运单号：235-96777855\n航线：CAN-LAX\n头程ATD：2026-08-21 05:33\n航班状态：in transit"],
+  ["235-96793384","豪迈","arrived","CA933","（航班已飞 ATD=2026-08-17 12:00，无需飞常准查询）","无deadline信息，不做比对",dt(-4,"12:00"),dt(-4,"12:00"),dt(-3,"23:50"),dt(-3,"22:40"),"PVG","CDG","否","否","","235-96793384\nDEP 2026-08-17 12:00 PVG CA933\nRCF 2026-08-17 20:30 CDG CA933\nStatus: Arrived","","运单号：235-96793384\n航线：PVG-CDG\n头程ATD：2026-08-17 12:00\n头程ATA：2026-08-17 22:40"],
+  ["014-24702554","超达","Tracking...","CA1049","飞常准查询（CA1049 / 2026-08-21）：航司数据延迟，追踪中","无deadline信息，不做比对",dt(0,"10:00"),"","2026-08-24 18:30","","PVG","LHR","是","否","","014-24702554\nTracking...\nFlightAware: CA1049 / 2026-08-21\n航司数据延迟，追踪中","","运单号：014-24702554\n查询状态：Tracking...\n飞常准：航司数据延迟，追踪中"],
+  ["695-56519971","海信","delivered","CV7742","（航班已飞 ATD=2026-08-16 09:30，无需飞常准查询）","无deadline信息，不做比对",dt(-5,"09:30"),dt(-5,"09:30"),dt(-4,"21:00"),dt(-4,"20:15"),"SZX","AMS","否","否","","695-56519971\nDEP 2026-08-16 09:30 SZX CV7742\nDLV Shipment Delivered 2026-08-18 08:20 AMS","","运单号：695-56519971\n航线：SZX-AMS\n头程ATD：2026-08-16 09:30\n头程ATA：2026-08-18 20:15"],
+  ["480-00378044","银宝山新","Not Found","","（无航班号，跳过飞常准查询）","无deadline信息，不做比对","","","","","","","否","否","","480-00378044\nStatus: Not Found\n无航班号，跳过飞常准查询","","运单号：480-00378044\n查询状态：Not Found"],
+  ["235-96777881","超达","Not Found","","（无航班号，跳过飞常准查询）","存在延迟｜提醒：预计起飞晚于代理截止时间",dt(1,"14:00"),"","","","CAN","FRA","是","是","预计起飞晚于代理截止时间","235-96777881\nStatus: Not Found\nETD 2026-08-24 14:00\n存在延迟｜提醒：预计起飞晚于代理截止时间","","运单号：235-96777881\n查询状态：Not Found\ndeadline校验结果：存在延迟｜提醒：预计起飞晚于代理截止时间"],
+  ["160-11578140","德诚宝","booked","QR871","（未到 ETD（2026-08-25 05:05），航班未起飞，暂无需飞常准查询）","无deadline信息，不做比对",dt(4,"05:05"),"",dt(5,"17:20"),"","PVG","IST","否","否","","160-11578140\nStatus: Booked\nFlight No.: QR871\nETD 2026-08-25 05:05","","运单号：160-11578140\n航线：PVG-IST\n头程ETD：2026-08-25 05:05\n航班状态：booked"],
+  ["272-75433610","海信模具","Not Found","","（无航班号，跳过飞常准查询）","无deadline信息，不做比对","","","","","","","否","否","","272-75433610\nStatus: Not Found","","运单号：272-75433610\n查询状态：Not Found"],
+  ["235-96793395","中誉","in transit","MF8111","（航班已飞 ATD=2026-08-21 11:20，无需飞常准查询）","无deadline信息，不做比对",dt(0,"11:20"),dt(0,"11:20"),dt(1,"23:45"),"","XMN","SYD","否","否","","235-96793395\nDEP 2026-08-21 11:20 XMN MF8111\nStatus: In Transit","","运单号：235-96793395\n航线：XMN-SYD\n头程ATD：2026-08-21 11:20"],
+  ["176-44558877","海泰科","booked","MU7507","（航班已飞 ATD=2026-08-21 09:00，无需飞常准查询）","存在延迟｜提醒：预计起飞晚于代理截止时间",dt(0,"09:00"),dt(0,"09:00"),dt(2,"06:30"),"","PVG","MEL","否","否","飞常准显示已飞但查询状态仍为booked","176-44558877\n飞常准：航班已飞 ATD=2026-08-21 09:00\n查询状态：booked\n存在延迟｜提醒：预计起飞晚于代理截止时间","","运单号：176-44558877\n航线：PVG-MEL\n头程ATD：2026-08-21 09:00\ndeadline校验结果：存在延迟\n冲突备注：飞常准显示已飞但查询状态仍为booked"]
+];
+const DEMO_FIELDS = ["主单号","客户","查询状态","航班号","飞常准","deadline校验结果","ETD","ATD","ETA","ATA","启运港","目的港","是否转运","是否分批","冲突备注","航班信息","航班信息2","AI分析结果"];
+function buildDemoData(){
+  return {
+    mode:"demo", updated_at:new Date().toISOString(), fields:DEMO_FIELDS,
+    records: DEMO_ROWS.map((r,i)=>({ id:"demo_"+i, values:{
+      "主单号":r[0],"客户":r[1],"查询状态":r[2],"航班号":r[3],"飞常准":r[4],
+      "deadline校验结果":r[5],"ETD":r[6],"ATD":r[7],"ETA":r[8],"ATA":r[9],
+      "启运港":r[10],"目的港":r[11],"是否转运":r[12],"是否分批":r[13],"冲突备注":r[14],
+      "航班信息":r[15],"航班信息2":r[16],"AI分析结果":r[17]
+    }}))
+  };
+}
+
+/* =====================================================
+   字段自动映射
+===================================================== */
+function detectMapping(fieldNames, override){
+  const m = {};
+  const used = new Set();
+  // 1. 先应用用户的手动映射
+  if(override) for(const r of ROLES){
+    const f = override[r.key];
+    if(f && fieldNames.includes(f)){ m[r.key]=f; used.add(f); }
+  }
+  // 2. 自动匹配剩余角色
+  for(const r of ROLES){
+    if(m[r.key]) continue;
+    const isSecond = r.key.startsWith("second");
+    let best=null, bestScore=-1;
+    for(const fn of fieldNames){
+      if(used.has(fn)) continue;
+      // 避免"二程ETD"被一程的 etd 关键词贪婪抢走：二程角色只认含"二程"的列，反之亦然
+      if(isSecond && !fn.includes("二程")) continue;
+      if(!isSecond && fn.includes("二程")) continue;
+      const low = fn.toLowerCase();
+      for(let i=0;i<r.kw.length;i++){
+        const kw = r.kw[i].toLowerCase();
+        if(low.includes(kw)){ const score = 100 - i*10 - fn.length*0.1; if(score>bestScore){bestScore=score;best=fn;} }
+      }
+    }
+    if(best){ m[r.key]=best; used.add(best); }
+  }
+  return m;
+}
+function getOverride(){ try{ return JSON.parse(localStorage.getItem("mapOverride")||"{}"); }catch(e){ return {}; } }
+
+/* =====================================================
+   记录工具
+===================================================== */
+function V(rec, role){ const f=MAPPING[role]; return f ? (rec.values[f]??"") : ""; }
+function num(v){ const n=parseFloat(String(v).replace(/[,，\s]/g,"")); return isNaN(n)?0:n; }
+/* 异常判定（按业务定义）：
+   ① 查询状态 = 查询不到
+   ② deadline校验结果 存在延迟
+   ③ 飞常准显示已飞，但查询状态显示实际未起飞 */
+/* 异常判定（按业务定义，支持中英状态值）：
+   ① 查询状态 = 查询不到 / Not Found
+   ② deadline校验结果 存在延迟
+   ③ 飞常准显示已飞（航班已飞），但查询状态显示实际未起飞 */
+function hasNewRules(){ return !!(MAPPING.queryStatus || MAPPING.vf || MAPPING.deadline); }
+function isAnomaly(rec){
+  if(hasNewRules()){
+    const qs=String(V(rec,"queryStatus")), qsl=qs.toLowerCase();
+    if(qsl.includes("not found") || qs.includes("查询不到")) return true;
+    if(String(V(rec,"deadline")).includes("延迟")) return true;
+    const vf=String(V(rec,"vf"));
+    if(/航班已飞|已飞|已起飞/.test(vf) && qs && !FLOWN_WORDS.some(w=>qsl.includes(w))) return true;
+    return false;
+  }
+  const a = V(rec,"anomaly"); if(a && String(a).trim()) return true;
+  const s = String(V(rec,"status"));
+  return ANOMALY_WORDS.some(w=>s.includes(w));
+}
+function anomalyText(rec){
+  if(hasNewRules()){
+    const parts=[];
+    const qs=String(V(rec,"queryStatus")), qsl=qs.toLowerCase(), vf=String(V(rec,"vf")), dl=String(V(rec,"deadline"));
+    if(qsl.includes("not found") || qs.includes("查询不到")) parts.push("查询状态：查询不到（Not Found）");
+    if(dl.includes("延迟")) parts.push("deadline校验：存在延迟");
+    if(/航班已飞|已飞|已起飞/.test(vf) && qs && !FLOWN_WORDS.some(w=>qsl.includes(w))) parts.push("飞常准显示已飞，实际未起飞");
+    return parts.join("；");
+  }
+  const a = String(V(rec,"anomaly")).trim();
+  if(a) return a;
+  const s = String(V(rec,"status")).trim();
+  return ANOMALY_WORDS.some(w=>s.includes(w)) ? ("状态异常："+s) : "";
+}
+/* 查询状态配色（小写匹配，中英双语） */
+function qsStyle(s){
+  if(!s) return {bg:"#f1f5f9",fg:"#64748b"};
+  const low=String(s).toLowerCase();
+  for(const r of QS_STYLE){ if(r.kw.some(k=>low.includes(k.toLowerCase()))) return {bg:r.bg,fg:r.fg}; }
+  return {bg:"#e2e8f0",fg:"#475569"};
+}
+function statusStyle(s){
+  if(!s) return {bg:"#f1f5f9",fg:"#64748b"};
+  for(const k in STATUS_STYLE){ if(s.includes(k)) return STATUS_STYLE[k]; }
+  if(isAnomaly({values:{}})===false && ANOMALY_WORDS.some(w=>s.includes(w))) return {bg:"#fee2e2",fg:"#b91c1c"};
+  return {bg:"#eef2ff",fg:"#4338ca"};
+}
+function fmtWeight(n){ return n>=1000 ? (n/1000).toFixed(1).replace(/\.0$/,"")+" 吨" : Math.round(n)+" KG"; }
+
+/* 通用日期解析：支持 YYYY-MM-DD HH:MM、YYYY-MM-DDTHH:MM 等 */
+function parseDate(s){
+  if(!s) return null;
+  const clean = String(s).trim().replace(/\//g,"-");
+  const m = clean.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::\d{2})?)?$/);
+  if(!m) return null;
+  const d = new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]), parseInt(m[4]||0), parseInt(m[5]||0));
+  if(isNaN(d.getTime())) return null;
+  return d;
+}
+
+/* ETD/ATD 分项异常判定（表格内红色叹号 + 悬浮说明）
+   - ETD 前叹号：ETD 日期晚于「代理deadline」日期
+   - ATD 前叹号：飞常准校验异常（数据缺失、错误、或显示已飞但实际未起飞） */
+function hasDeadlineIssue(rec){
+  const etdStr = String(V(rec,"etd") || V(rec,"flightDate") || "");
+  const dlStr = String(V(rec,"agentDeadline") || "");
+  if(etdStr && dlStr){
+    const etd = parseDate(etdStr), dl = parseDate(dlStr);
+    if(etd && dl) return etd > dl;
+  }
+  // fallback：按 deadline 校验文本判断
+  const dl = String(V(rec,"deadline"));
+  return dl.includes("延迟") || dl.includes("晚于");
+}
+function deadlineIssueText(rec){
+  const etdStr = String(V(rec,"etd") || V(rec,"flightDate") || "");
+  const dlStr = String(V(rec,"agentDeadline") || "");
+  if(dlStr && etdStr){
+    const etd = parseDate(etdStr), dl = parseDate(dlStr);
+    if(etd && dl && etd > dl) return "ETD（" + etdStr + "）晚于代理 deadline（" + dlStr + "）";
+  }
+  const dl = String(V(rec,"deadline"));
+  if(dl.includes("延迟")) return dl;
+  return "航班推迟（deadline校验异常）";
+}
+function hasFlightAwareIssue(rec){
+  const vf = String(V(rec,"vf"));
+  const qs = String(V(rec,"queryStatus")).toLowerCase();
+  // 以下两类是「正常说明」，不算异常：没有航班号（不查飞常准）、航班已飞（无需查飞常准）
+  if(/无航班号|无需飞常准|不查飞常准|跳过飞常准/i.test(vf)) return false;
+  if(!vf) return false;
+  // 真正的查询失败：未找到 / 查无 / 暂无数据 / 失败 / 网络错误 / 无法查询 / 数据延迟
+  if(/未找到|not found|查无|暂无数据|失败|错误|无法查询|network error|delay|延迟/i.test(vf)) return true;
+  // 飞常准显示已飞，但查询状态仍显示未起飞
+  if(/航班已飞|已飞|已起飞/.test(vf) && qs && !FLOWN_WORDS.some(w=>qs.includes(w))) return true;
+  return false;
+}
+function flightAwareIssueText(rec){
+  const vf = String(V(rec,"vf"));
+  const qs = String(V(rec,"queryStatus")).toLowerCase();
+  if(/航班已飞|已飞|已起飞/.test(vf) && qs && !FLOWN_WORDS.some(w=>qs.includes(w))) return "飞常准显示已飞，实际未起飞";
+  return vf || "飞常准校验异常";
+}
+
+/* =====================================================
+   数据加载
+===================================================== */
+async function loadData(manual, silent){
+  if(!silent) showLoading(true);
+  let data = null, err = null;
+  if(window.__EMBEDDED_DATA__){ data = window.__EMBEDDED_DATA__; }
+  else if(location.protocol.startsWith("http")){
+    try{
+      const res = await apiFetch(API_BASE+"/api/data",{cache:"no-store"});
+      const j = await res.json();
+      if(j.ok) data = j.data; else err = j.msg;
+    }catch(e){ err = "无法连接本地服务"; }
+  }
+  if(!data){ data = buildDemoData(); if(err) data.notice = err; }
+  DATA = data;
+  MAPPING = detectMapping(data.fields, getOverride());
+  if(!silent) curPage = 1;
+  renderAll();
+  if(!silent) showLoading(false);
+  if(manual) toast(DATA.mode==="live" ? "已从飞书多维表格刷新数据 ✓" : "已刷新（当前为演示数据）", DATA.mode==="live"?"ok":"");
+}
+
+/* ---- 实时更新：每 30 秒静默拉取，仅在数据变化时刷新 + 弹提示 ---- */
+function dataSignature(d){
+  return JSON.stringify(d.records.map(r=>[r.id, JSON.stringify(r.values)]));
+}
+async function autoRefresh(){
+  if(loginModalOpen) return;   // 登录弹窗期间不打断
+  // 飞书事件推送需要公网回调地址，本地部署无法接收；
+  // 这里用 30 秒轮询 + 内容签名比对，数据没变就不动界面，变了才静默刷新并提示
+  if(DATA.mode!=="live") return;
+  if(document.getElementById("drawer").classList.contains("show")) return;     // 详情打开时不打断
+  if(document.getElementById("settingsMask").classList.contains("show")) return; // 设置打开时不打断
+  try{
+    const res = await apiFetch(API_BASE+"/api/data",{cache:"no-store"});
+    const j = await res.json();
+    if(!j.ok) return;
+    if(dataSignature(j.data) !== dataSignature(DATA)){
+      DATA = j.data;
+      MAPPING = detectMapping(DATA.fields, getOverride());
+      renderAll();
+      toast("🛫 检测到飞书数据更新，已自动刷新","ok");
+    }
+  }catch(e){}
+}
+
+/* =====================================================
+   筛选逻辑
+===================================================== */
+function filteredRecords(){
+  const kw = document.getElementById("globalSearch").value.trim().toLowerCase();
+  const ft = document.getElementById("filterType").value;
+  const fs = document.getElementById("filterStatus").value;
+  const fd = document.getElementById("filterDate").value;
+  const fa = document.getElementById("chkAnomaly").checked;
+  let list = DATA.records.filter(r=>{
+    if(selCustomer && V(r,"customer")!==selCustomer) return false;
+    if(fa && !isAnomaly(r)) return false;
+    if(ft && V(r,"cargoType")!==ft) return false;
+    if(fs && (V(r,"queryStatus")||V(r,"status"))!==fs) return false;
+    if(fd){
+      const dv = V(r,"flightDate"); if(!dv) return false;
+      const dt = new Date(dv.replace(/(\.\d+)?[+\s].*$/,"")); if(isNaN(dt)) return false;
+      const today = new Date(); today.setHours(0,0,0,0);
+      const diff = Math.floor((dt-today)/86400000);
+      if(fd==="today" && diff!==0) return false;
+      if(fd==="3d" && (diff<0||diff>3)) return false;
+      if(fd==="7d" && (diff<0||diff>7)) return false;
+      if(fd==="past" && diff>=0) return false;
+    }
+    if(kw){
+      const hay = [V(r,"mawb"),V(r,"customer"),V(r,"flight"),V(r,"dest"),V(r,"origin"),
+                   V(r,"cargoType"),V(r,"queryStatus"),V(r,"status"),V(r,"vf"),V(r,"deadline"),
+                   V(r,"remark"),V(r,"anomaly")].join(" ").toLowerCase();
+      if(!hay.includes(kw)) return false;
+    }
+    return true;
+  });
+  // 排序
+  const sk = sortKey, dir = sortDir;
+  if(sk){
+    list.sort((a,b)=>{
+      let x=V(a,sk), y=V(b,sk);
+      if(sk==="pieces"||sk==="weight"){ x=num(x); y=num(y); return (x-y)*dir; }
+      if(sk==="flightDate"){ x=x||"0000"; y=y||"0000"; return x<y?-dir:x>y?dir:0; }
+      return String(x).localeCompare(String(y),"zh")*dir;
+    });
+  }
+  return list;
+}
+
+/* =====================================================
+   渲染：总控
+===================================================== */
+function renderAll(){ renderMode(); renderVisibility(); renderSidebar(); renderFilters(); renderStats(); renderCharts(); renderTable(); }
+/* 客户详情页不显示仪表盘 */
+function renderVisibility(){ document.getElementById("dashboardZone").style.display = selCustomer ? "none" : "block"; }
+
+function renderMode(){
+  const live = DATA.mode==="live";
+  document.getElementById("modeLabel").innerHTML =
+    '数据来源：<span class="tag '+(live?"tag-live":"tag-demo")+'">'+(live?"● 飞书实时数据":"● 演示数据")+'</span><br>'+
+    (live ? '上次同步：'+(DATA.updated_at?new Date(DATA.updated_at).toLocaleString("zh-CN"):"—") : '点击右上角 ⚙ 连接飞书表格');
+  document.getElementById("updatedInfo").textContent =
+    (live?"飞书多维表格 · 同步于 ":"演示数据 · 生成于 ")+
+    (DATA.updated_at?new Date(DATA.updated_at).toLocaleTimeString("zh-CN"):"");
+  if(DATA.notice) document.getElementById("updatedInfo").textContent += "（"+DATA.notice+"）";
+}
+
+/* ---------- 侧边栏 ---------- */
+function renderSidebar(){
+  const groups = {};
+  let anomalyCnt = 0;
+  for(const r of DATA.records){
+    const c = V(r,"customer")||"（未填客户）";
+    groups[c] = groups[c]||{total:0,anomaly:0};
+    groups[c].total++;
+    if(isAnomaly(r)){ groups[c].anomaly++; anomalyCnt++; }
+  }
+  document.getElementById("cntAll").textContent = DATA.records.length;
+  document.getElementById("cntAnomaly").textContent = anomalyCnt;
+  document.getElementById("navAnomaly").classList.toggle("active", document.getElementById("chkAnomaly").checked);
+  document.getElementById("navAll").classList.toggle("active", !selCustomer && !document.getElementById("chkAnomaly").checked);
+
+  const kw = document.getElementById("custSearch").value.trim().toLowerCase();
+  const list = Object.keys(groups).filter(c=>!kw||c.toLowerCase().includes(kw))
+    .sort((a,b)=>groups[b].total-groups[a].total || a.localeCompare(b,"zh"));
+  document.getElementById("customerList").innerHTML = list.map(c=>{
+    const g = groups[c];
+    return '<button class="cust-item'+(selCustomer===c?" active":"")+'" onclick="selectCustomer('+JSON.stringify(c).replace(/"/g,"&quot;")+')">'+
+      '<span class="dot"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c)+'</span>'+
+      (g.anomaly?'<span class="an">'+g.anomaly+' 异常</span>':'')+
+      '<span class="cnt">'+g.total+' 票</span></button>';
+  }).join("") || '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px">未找到匹配的客户</div>';
+}
+function selectCustomer(c){
+  selCustomer = (selCustomer===c)?null:c;
+  expandedId=null; inlineEditingId=null;
+  document.getElementById("pageTitle").textContent = selCustomer ? ("客户 · "+selCustomer) : "货物总览";
+  curPage=1; renderVisibility(); renderSidebar(); renderTable();
+}
+function toggleAnomalyOnly(){
+  const chk=document.getElementById("chkAnomaly"); chk.checked=!chk.checked;
+  selCustomer=null; expandedId=null; inlineEditingId=null;
+  document.getElementById("pageTitle").textContent="货物总览";
+  curPage=1; renderVisibility(); renderSidebar(); renderTable();
+}
+function clearAllFilters(){
+  selCustomer=null; expandedId=null; inlineEditingId=null;
+  document.getElementById("globalSearch").value="";
+  document.getElementById("filterType").value="";
+  document.getElementById("filterStatus").value="";
+  document.getElementById("filterDate").value="";
+  document.getElementById("chkAnomaly").checked=false;
+  document.getElementById("pageTitle").textContent="货物总览";
+  curPage=1; renderVisibility(); renderSidebar(); renderTable();
+}
+function viewAllAnomalies(){
+  selCustomer=null; expandedId=null; inlineEditingId=null;
+  document.getElementById("globalSearch").value="";
+  document.getElementById("filterType").value="";
+  document.getElementById("filterStatus").value="";
+  document.getElementById("filterDate").value="";
+  document.getElementById("chkAnomaly").checked=true;
+  curPage=1; renderVisibility(); renderSidebar(); renderTable();
+  document.getElementById("chkAnomaly").scrollIntoView({behavior:"smooth",block:"center"});
+}
+
+/* ---------- 筛选下拉 ---------- */
+function renderFilters(){
+  const types=[...new Set(DATA.records.map(r=>V(r,"cargoType")).filter(Boolean))];
+  const stats=[...new Set(DATA.records.map(r=>V(r,"queryStatus")||V(r,"status")).filter(Boolean))];
+  fillSelect("filterType","全部货类",types);
+  fillSelect("filterStatus","查询状态",stats);
+}
+function fillSelect(id,label,opts){
+  const el=document.getElementById(id), cur=el.value;
+  el.innerHTML='<option value="">'+label+'</option>'+opts.map(o=>'<option>'+esc(o)+'</option>').join('');
+  if(opts.includes(cur)) el.value=cur;
+}
+
+/* ---------- 统计卡片（自适应：有件数/重量显示件数重量，否则显示今日起飞/客户数） ---------- */
+function renderStats(){
+  let pieces=0, weight=0, anomaly=0, todayCnt=0;
+  const customers=new Set();
+  const t=new Date(), p=n=>String(n).padStart(2,"0");
+  const todayStr=t.getFullYear()+"-"+p(t.getMonth()+1)+"-"+p(t.getDate());
+  for(const r of DATA.records){
+    pieces+=num(V(r,"pieces")); weight+=num(V(r,"weight"));
+    if(isAnomaly(r)) anomaly++;
+    const c=V(r,"customer"); if(c) customers.add(c);
+    if(String(V(r,"flightDate")).startsWith(todayStr)) todayCnt++;
+  }
+  const cards=[];
+  cards.push({icon:"📦",label:"货物总票数",v:DATA.records.length,unit:"票",cls:"c-blue",fn:"clearAllFilters()"});
+  if(MAPPING.pieces) cards.push({icon:"🧳",label:"总件数",v:pieces.toLocaleString(),unit:"件",cls:"c-orange",fn:"clearAllFilters()"});
+  if(MAPPING.weight) cards.push({icon:"⚖️",label:"总重量",v:fmtWeight(weight),unit:"",cls:"c-green",fn:"clearAllFilters()"});
+  if(MAPPING.flightDate) cards.push({icon:"✈️",label:"今日起飞",v:todayCnt,unit:"票",cls:"c-orange",fn:"filterToday()"});
+  cards.push({icon:"🏢",label:"客户数",v:customers.size,unit:"家",cls:"c-green",fn:"clearAllFilters()"});
+  cards.push({icon:"🚨",label:"异常票数",v:anomaly,unit:"票",cls:"c-red",fn:"toggleAnomalyOnly()"});
+  document.querySelector(".stats").innerHTML = cards.map(c=>
+    '<div class="stat-card '+c.cls+'" onclick="'+c.fn+'"><div class="stat-label">'+c.icon+' '+c.label+'</div>'+
+    '<div class="stat-value">'+(c.unit?c.v+'<span class="stat-unit">'+c.unit+'</span>':c.v)+'</div></div>').join("");
+}
+function filterToday(){
+  selCustomer=null;
+  document.getElementById("globalSearch").value="";
+  document.getElementById("filterType").value="";
+  document.getElementById("filterStatus").value="";
+  document.getElementById("filterDate").value="today";
+  document.getElementById("chkAnomaly").checked=false;
+  document.getElementById("pageTitle").textContent="今日起飞";
+  curPage=1; renderVisibility(); renderSidebar(); renderTable();
+}
+
+/* ---------- 图表 ---------- */
+function renderCharts(){ renderDonut(); renderCustomerRank(); renderAlerts(); }
+
+function renderDonut(){
+  const dist = {};
+  for(const r of DATA.records){ const t=V(r,"queryStatus")||V(r,"status")||"未知"; dist[t]=(dist[t]||0)+1; }
+  const entries = Object.entries(dist).sort((a,b)=>b[1]-a[1]);
+  const total = entries.reduce((s,e)=>s+e[1],0)||1;
+  const cx=95, cy=95, R=78, r2=52;
+  let angle=-Math.PI/2, paths="";
+  entries.forEach((e,i)=>{
+    const frac=e[1]/total, a1=angle, a2=angle+frac*Math.PI*2;
+    const large = frac>0.5?1:0;
+    const x1=cx+R*Math.cos(a1), y1=cy+R*Math.sin(a1), x2=cx+R*Math.cos(a2), y2=cy+R*Math.sin(a2);
+    const x3=cx+r2*Math.cos(a2), y3=cy+r2*Math.sin(a2), x4=cx+r2*Math.cos(a1), y4=cy+r2*Math.sin(a1);
+    const st=qsStyle(e[0]);
+    if(frac>=0.9999){
+      paths+='<circle cx="95" cy="95" r="'+((R+r2)/2)+'" fill="none" stroke="'+st.bg+'" stroke-width="'+(R-r2)+'"/>';
+    }else{
+      paths+='<path d="M'+x1+' '+y1+' A'+R+' '+R+' 0 '+large+' 1 '+x2+' '+y2+' L'+x3+' '+y3+' A'+r2+' '+r2+' 0 '+large+' 0 '+x4+' '+y4+' Z" fill="'+st.bg+'" stroke="#fff" stroke-width="1.5" style="cursor:pointer" onclick="filterByStatus('+JSON.stringify(e[0]).replace(/"/g,"&quot;")+')"/>';
+    }
+    angle=a2;
+  });
+  paths+='<text x="95" y="90" text-anchor="middle" font-size="24" font-weight="700" fill="#1f2937">'+DATA.records.length+'</text>'+
+         '<text x="95" y="110" text-anchor="middle" font-size="11" fill="#6b7280">总票数</text>';
+  document.getElementById("donutSvg").innerHTML=paths;
+  document.getElementById("donutLegend").innerHTML=entries.map((e,i)=>{
+    const st=qsStyle(e[0]);
+    return '<div class="legend-row" onclick="filterByStatus('+JSON.stringify(e[0]).replace(/"/g,"&quot;")+')">'+
+    '<span class="sq" style="background:'+st.bg+';border:1px solid '+st.fg+'55"></span>'+
+    '<span class="nm">'+esc(e[0])+'</span><span class="n">'+e[1]+'票</span>'+
+    '<span class="pct">'+(e[1]/total*100).toFixed(1)+'%</span></div>';
+  }).join("");
+}
+function filterByStatus(t){
+  const el=document.getElementById("filterStatus");
+  el.value = (el.value===t)?"":t;
+  renderTable();
+}
+
+function renderCustomerRank(){
+  const g={};
+  for(const r of DATA.records){
+    const c=V(r,"customer")||"（未填客户）";
+    g[c]=g[c]||{t:0,a:0};
+    g[c].t++; if(isAnomaly(r)) g[c].a++;
+  }
+  const entries=Object.entries(g).sort((a,b)=>b[1].t-a[1].t).slice(0,8);
+  const max=Math.max(...entries.map(e=>e[1].t),1);
+  document.getElementById("customerRank").innerHTML=entries.map(e=>{
+    const an=e[1].a;
+    return '<div class="bar-row" style="cursor:pointer" onclick="selectCustomer('+JSON.stringify(e[0]).replace(/"/g,"&quot;")+')" title="点击查看 '+esc(e[0])+' 的货物">'+
+      '<div class="bar-top"><span class="nm">'+esc(e[0])+'</span>'+
+      '<span class="val">'+e[1].t+' 票'+(an?' · <span style="color:#dc2626;font-weight:600">'+an+' 异常</span>':'')+'</span></div>'+
+      '<div class="bar-track"><div class="bar-fill" style="width:'+(e[1].t/max*100)+'%;background:'+(an?'#fca5a5':'#93b4f8')+'"></div></div></div>';
+  }).join("") || '<div class="alert-empty">暂无客户数据</div>';
+}
+
+function renderAlerts(){
+  const alerts = DATA.records.filter(isAnomaly).slice(0,12);
+  document.getElementById("alertList").innerHTML = alerts.map(r=>
+    '<div class="alert-item" onclick="openDrawerById(\''+r.id+'\')">'+
+    '<span class="alert-tag">异常</span>'+
+    '<div class="alert-body"><div class="alert-title"><span class="mawb">'+esc(V(r,"mawb")||"—")+'</span>'+
+    '<span style="color:#6b7280;font-weight:400;font-size:12px">'+esc(V(r,"customer"))+'</span></div>'+
+    '<div class="alert-desc">'+esc(anomalyText(r))+'</div></div></div>').join("")
+    || '<div class="alert-empty">✓ 当前没有异常货件</div>';
+}
+
+/* ---------- 表格 ---------- */
+const PAGE_SIZE = 50;
+const COLS = [
+  {role:"mawb",label:"主单号",sortable:false},
+  {role:"queryStatus",label:"查询状态",sortable:true},
+  {role:"customer",label:"客户",sortable:true},
+  {role:"cargoType",label:"货类",sortable:true},
+  {role:"flight",label:"航班号",sortable:true},
+  {role:"flightDate",label:"ETD",sortable:true},
+  {role:"atd",label:"ATD",sortable:true},
+  {role:"eta",label:"ETA",sortable:true},
+  {role:"ata",label:"ATA",sortable:true},
+  {role:"origin",label:"始发",sortable:false},
+  {role:"dest",label:"目的",sortable:false},
+  {role:"pieces",label:"件数",sortable:true},
+  {role:"weight",label:"重量(KG)",sortable:true},
+  {role:"status",label:"状态",sortable:true},
+  {role:"anomaly",label:"异常情况",sortable:false}
+];
+function activeCols(){
+  let cols = COLS.filter(c=> (MAPPING[c.role] || (c.role==="anomaly" && hasNewRules()))
+              && !(c.role==="status" && MAPPING.status===MAPPING.queryStatus));
+  // 客户详情页：列表里不显示 ETD/ATD/ETA/ATA 以及二程时间
+  if(selCustomer){
+    const hide = new Set(["flightDate","etd","atd","eta","ata","secondEtd","secondAtd","secondEta","secondAta"]);
+    cols = cols.filter(c => !hide.has(c.role));
+  }
+  return cols;
+}
+function colLabel(c){ return MAPPING[c.role] || c.label; }
+
+function renderTimeCell(rec, role, issueType){
+  const v = V(rec,role);
+  const val = '<span style="font-family:Consolas,monospace;font-weight:600;color:#475569">'+esc(v||"—")+'</span>';
+  if(issueType==="etd" && hasDeadlineIssue(rec) && v){
+    return '<td><span class="warn-icon" onclick="event.stopPropagation()"><span class="tip">'+esc(deadlineIssueText(rec))+'</span>!</span>'+val+'</td>';
+  }
+  if(issueType==="atd" && hasFlightAwareIssue(rec) && v){
+    return '<td><span class="warn-icon" onclick="event.stopPropagation()"><span class="tip">'+esc(flightAwareIssueText(rec))+'</span>!</span>'+val+'</td>';
+  }
+  return '<td title="'+esc(v)+'">'+val+'</td>';
+}
+
+function renderTable(){
+  const list = filteredRecords();
+  const cols = activeCols();
+  const totalPages = Math.max(1, Math.ceil(list.length/PAGE_SIZE));
+  if(curPage>totalPages) curPage=totalPages;
+  const pageList = list.slice((curPage-1)*PAGE_SIZE, curPage*PAGE_SIZE);
+
+  document.getElementById("tableHead").innerHTML = "<tr>"+
+    cols.map(c=>{
+      const lab=colLabel(c);
+      if(!c.sortable) return '<th class="no-sort">'+lab+'</th>';
+      const arrow = sortKey===c.role ? (sortDir===1?" ▲":" ▼") : "";
+      return '<th onclick="sortBy(\''+c.role+'\')">'+lab+arrow+'</th>';
+    }).join("")+"</tr>";
+
+  const isCustPage = !!selCustomer;
+  document.getElementById("tableBody").innerHTML = pageList.map(r=>{
+    const an = isAnomaly(r);
+    const expanded = isCustPage && expandedId===r.id;
+    const rowClass = (an?"has-anomaly ":"") + (isCustPage?"customer-row ":"") + (expanded?"expanded":"");
+    const clickAttr = isCustPage ? 'onclick="toggleRow(\''+r.id+'\',event)"' : 'onclick="openDrawerById(\''+r.id+'\')"';
+    const dataCells = cols.map(c=>{
+      const v = V(r,c.role);
+      if(c.role==="mawb") return '<td class="mawb-cell">'+esc(v||"—")+'</td>';
+      if(c.role==="queryStatus"){ const st=qsStyle(v); return '<td><span class="pill" style="background:'+st.bg+';color:'+st.fg+';font-weight:600">'+esc(v||"—")+'</span></td>'; }
+      if(c.role==="cargoType") return '<td><span class="pill type-pill">'+esc(v||"—")+'</span></td>';
+      if(c.role==="status"){ const st=statusStyle(v); return '<td><span class="pill" style="background:'+st.bg+';color:'+st.fg+'">'+esc(v||"—")+'</span></td>'; }
+      if(c.role==="pieces"||c.role==="weight") return '<td style="text-align:right;font-variant-numeric:tabular-nums">'+(v?num(v).toLocaleString():"—")+'</td>';
+      if(c.role==="origin"||c.role==="dest") return '<td style="font-family:Consolas,monospace;font-weight:600;color:#475569">'+esc(v||"—")+'</td>';
+      if(c.role==="flightDate"||c.role==="etd") return renderTimeCell(r,c.role,"etd");
+      if(c.role==="atd") return renderTimeCell(r,c.role,"atd");
+      if(c.role==="anomaly") return '<td class="anomaly-text" title="'+esc(anomalyText(r))+'">'+(an?'<span style="color:#dc2626">⚠ '+esc(anomalyText(r))+'</span>':"—")+'</td>';
+      return '<td title="'+esc(v)+'">'+esc(v||"—")+'</td>';
+    }).join("");
+    let html = '<tr class="'+rowClass+'" '+clickAttr+'>'+dataCells+'</tr>';
+    if(expanded){
+      html += '<tr class="flight-drop"><td colspan="'+cols.length+'"><div class="flight-drop-inner customer-expand">'+renderCustomerExpand(r, inlineEditingId===r.id)+'</div></td></tr>';
+    }
+    return html;
+  }).join("") || '<tr><td colspan="'+cols.length+'"><div class="empty-state"><div class="big">🔍</div>没有符合条件的货件<br><span style="font-size:12px">试试调整筛选条件或关键词</span></div></td></tr>';
+
+  document.getElementById("resultInfo").textContent = "共 "+list.length+" 条记录"+(list.length>PAGE_SIZE?(" · 第 "+curPage+"/"+totalPages+" 页"):"");
+  const pager=document.getElementById("pager");
+  if(list.length>PAGE_SIZE){
+    pager.style.display="flex";
+    pager.innerHTML='<button '+(curPage<=1?"disabled":"")+' onclick="gotoPage('+(curPage-1)+')">‹ 上一页</button>'+
+      '<span>第 '+curPage+' / '+totalPages+' 页</span>'+
+      '<button '+(curPage>=totalPages?"disabled":"")+' onclick="gotoPage('+(curPage+1)+')">下一页 ›</button>';
+  }else pager.style.display="none";
+}
+function toggleRow(id,event){
+  if(event && (event.target.closest('.warn-icon') || event.target.closest('a') || event.target.closest('button'))) return;
+  if(expandedId===id){ expandedId=null; inlineEditingId=null; }
+  else { expandedId=id; inlineEditingId=null; }
+  renderTable();
+  if(expandedId){
+    setTimeout(()=>{
+      const el=document.querySelector('.flight-drop');
+      if(el) el.scrollIntoView({behavior:"smooth",block:"nearest"});
+    },30);
+  }
+}
+function sortBy(role){
+  expandedId=null; inlineEditingId=null;
+  if(sortKey===role) sortDir*=-1; else {sortKey=role; sortDir=-1;}
+  renderTable();
+}
+function gotoPage(p){ expandedId=null; inlineEditingId=null; curPage=p; renderTable(); document.querySelector(".content").scrollTop=0; }
+
+/* ---------- 客户页航班详情下拉框：只展示 History/Tracking 事件，并支持查看和编辑全部字段 ---------- */
+
+/* 从文本中提取 History（Tracking Events）部分，去掉状态/航线/航班号等说明头 */
+function extractHistoryLines(raw){
+  const lines = String(raw || "").split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  if(!lines.length) return [];
+  // 若存在 History/Tracking Events/事件记录 等标题，只取标题之后的行
+  const markerIdx = lines.findIndex(ln => /history|tracking events|事件记录|跟踪事件|历史记录|tracking history/i.test(ln));
+  let hist = markerIdx >= 0 ? lines.slice(markerIdx + 1) : lines;
+  // 过滤掉常见说明头和 History 表格表头
+  const skipRe = /^(status|state|route|flight\s*no\.?|flight\s*number|airline|awb|mawb|air\s*waybill|booking|total\s*piece|weight|piece\s*\/\s*weight|departure\s*time|arrival\s*time|estimated|actual|pick\s*up\s*notified|shipper|consignee|origin|destination|event\s*time\(local\)|event\s*time|description|station)\b/i;
+  return hist.filter(ln => !skipRe.test(ln)).map(ln => ln.replace(/\t+/g, ' | '));
+}
+
+/* 把航班信息字段渲染为一条条历史事件；若字段是附件则展示为文件卡片 */
+function renderFlightHistory(rec){
+  const fi = V(rec, "flightInfo") || "";
+  const fi2 = V(rec, "flightInfo2") || "";
+  let attachHtml = "";
+  const allLines = [...extractHistoryLines(fi)];
+  const s2 = String(fi2 || "").trim();
+  if(s2 && s2.indexOf("file_token") < 0) allLines.push(...extractHistoryLines(fi2));
+  if(s2 && s2.indexOf("file_token") >= 0){
+    try{
+      const arr = JSON.parse(s2);
+      const items = Array.isArray(arr) ? arr : [arr];
+      attachHtml = items.map(a => {
+        const name = a.name || "附件";
+        const size = (typeof a.size === "number") ? (a.size / 1024).toFixed(0) + " KB" : "";
+        return '<div class="trk-row"><span class="trk-v">📎 ' + esc(name) + (size ? '（' + esc(size) + '）' : '') + ' · 二程跟踪文件</span></div>';
+      }).join("");
+    }catch(e){}
+  }
+  if(!allLines.length && !attachHtml){
+    return '<div class="trk-empty">暂无历史跟踪信息</div>';
+  }
+  return '<div class="trk-list history-list">' +
+    allLines.map(ln => '<div class="trk-row"><span class="trk-v">' + esc(ln) + '</span></div>').join("") +
+    attachHtml +
+    '</div>';
+}
+
+/* 取字段名（支持主角色 + 回退角色） */
+function fieldFor(role, fallbackRole){
+  return MAPPING[role] || (fallbackRole && MAPPING[fallbackRole]) || null;
+}
+function rawVal(rec, role, fallbackRole){
+  const f = fieldFor(role, fallbackRole);
+  return f ? (rec.values[f] ?? "") : "";
+}
+function cellVal(rec, role, fallbackRole){
+  const v = rawVal(rec, role, fallbackRole);
+  return (v === "" || v === undefined || v === null) ? "—" : String(v);
+}
+function warnIcon(tip){
+  return '<span class="warn-icon">!<span class="tip">' + esc(tip) + '</span></span>';
+}
+/* 把服务器下发的日期值转成 <input type="datetime-local"> 需要的格式（YYYY-MM-DDTHH:MM） */
+function toDatetimeLocal(v){
+  if(v === undefined || v === null || v === "") return "";
+  // 兼容原始毫秒时间戳（数字或纯数字字符串）
+  let ms = null;
+  const numv = Number(v);
+  if(!isNaN(numv) && numv > 10**11 && numv < 10**14){ ms = numv; }
+  let d = ms ? new Date(ms) : parseDate(String(v));
+  if(!d) return "";
+  const p = n => String(n).padStart(2,"0");
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());
+}
+/* 判断一个值"看起来像日期/时间"，用于在没有字段类型时也能用日期选择器 */
+function looksLikeDate(v){
+  if(v === undefined || v === null || v === "") return false;
+  const s = String(v).trim();
+  if(/^\d{13,14}$/.test(s)) return true;  // 毫秒时间戳
+  return /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})([ T](\d{1,2}):(\d{2})(:\d{2})?)?$/.test(s);
+}
+
+/* 客户页点击单条后展开的完整面板：按手写格式展示运单详情 + 历史 + 编辑同步 */
+function renderCustomerExpand(rec, editing){
+  const mawb = V(rec, "mawb") || "—";
+  let html = "";
+
+  if(editing){
+    html += renderCustomerEditForm(rec);
+  }else{
+    html += renderCustomerDetail(rec);
+  }
+
+  html += '<div class="expand-section history-section" style="margin-top:14px">' +
+    '<h4 style="margin:0 0 10px 0">🛫 航班跟踪历史 · ' + esc(mawb) + '</h4>' +
+    renderFlightHistory(rec) +
+    '</div>';
+  return html;
+}
+
+/* 手写格式：只读 */
+function renderCustomerDetail(rec){
+  const mawb = cellVal(rec, "mawb");
+  const qs = cellVal(rec, "queryStatus", "status");
+  const deadline = cellVal(rec, "agentDeadline");
+  const flight = cellVal(rec, "flight");
+  const etd = cellVal(rec, "etd", "flightDate");
+  const atd = cellVal(rec, "atd");
+  const eta = cellVal(rec, "eta");
+  const ata = cellVal(rec, "ata");
+  const sEtd = cellVal(rec, "secondEtd");
+  const sAtd = cellVal(rec, "secondAtd");
+  const sEta = cellVal(rec, "secondEta");
+  const sAta = cellVal(rec, "secondAta");
+  const split = cellVal(rec, "isSplit");
+  const transfer = cellVal(rec, "isTransfer");
+  const etdWarn = hasDeadlineIssue(rec) ? warnIcon(deadlineIssueText(rec)) : "";
+  const atdWarn = hasFlightAwareIssue(rec) ? warnIcon(flightAwareIssueText(rec)) : "";
+
+  return '<div class="expand-section customer-detail">' +
+    '<div class="detail-head">' +
+      '<h4>📋 运单详情</h4>' +
+      '<button class="btn btn-primary" onclick="enterInlineEdit(\'' + esc(rec.id) + '\')">✎ 编辑并同步</button>' +
+    '</div>' +
+    '<div class="detail-body">' +
+      '<div class="detail-row">' +
+        '<div class="detail-cell">' +
+          '<div class="k">主单号</div>' +
+          '<div class="v has-tip">' + esc(mawb) +
+            '<span class="tip">是否分批：' + esc(split) + ' | 是否转货：' + esc(transfer) + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="detail-cell">' +
+          '<div class="k">查询情况</div>' +
+          '<div class="v">' + esc(qs) + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="detail-row">' +
+        '<div class="detail-cell">' +
+          '<div class="k">代理deadline</div>' +
+          '<div class="v">' + esc(deadline) + '</div>' +
+        '</div>' +
+        '<div class="detail-cell">' +
+          '<div class="k">航班号</div>' +
+          '<div class="v">' + esc(flight) + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="detail-row">' +
+        '<div class="detail-cell">' +
+          '<div class="k">ETD ' + etdWarn + '</div>' +
+          '<div class="v">' + esc(etd) + '</div>' +
+        '</div>' +
+        '<div class="detail-cell">' +
+          '<div class="k">ATD ' + atdWarn + '</div>' +
+          '<div class="v">' + esc(atd) + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="detail-row">' +
+        '<div class="detail-cell">' +
+          '<div class="k">ETA</div>' +
+          '<div class="v">' + esc(eta) + '</div>' +
+        '</div>' +
+        '<div class="detail-cell">' +
+          '<div class="k">ATA</div>' +
+          '<div class="v">' + esc(ata) + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="detail-row">' +
+        '<div class="detail-cell">' +
+          '<div class="k">二程ETD</div>' +
+          '<div class="v">' + esc(sEtd) + '</div>' +
+        '</div>' +
+        '<div class="detail-cell">' +
+          '<div class="k">二程ATD</div>' +
+          '<div class="v">' + esc(sAtd) + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="detail-row">' +
+        '<div class="detail-cell">' +
+          '<div class="k">二程ETA</div>' +
+          '<div class="v">' + esc(sEta) + '</div>' +
+        '</div>' +
+        '<div class="detail-cell">' +
+          '<div class="k">二程ATA</div>' +
+          '<div class="v">' + esc(sAta) + '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+/* 手写格式：编辑态（与只读同布局，输入框替换为字段） */
+function renderCustomerEditForm(rec){
+  const types = DATA.field_types || {};
+  const rows = [
+    [
+      {label:"主单号", role:"mawb"},
+      {label:"查询情况", role:"queryStatus", fallback:"status"}
+    ],
+    [
+      {label:"代理deadline", role:"agentDeadline"},
+      {label:"航班号", role:"flight"}
+    ],
+    [
+      {label:"ETD", role:"etd", fallback:"flightDate"},
+      {label:"ATD", role:"atd"}
+    ],
+    [
+      {label:"ETA", role:"eta"},
+      {label:"ATA", role:"ata"}
+    ],
+    [
+      {label:"二程ETD", role:"secondEtd"},
+      {label:"二程ATD", role:"secondAtd"}
+    ],
+    [
+      {label:"二程ETA", role:"secondEta"},
+      {label:"二程ATA", role:"secondAta"}
+    ]
+  ];
+
+  let body = "";
+  for(const row of rows){
+    body += '<div class="detail-row">';
+    for(const c of row){
+      const f = fieldFor(c.role, c.fallback);
+      const v = f ? (rec.values[f] ?? "") : "";
+      const t = f ? types[f] : null;
+      // 附件(17) / 人员(13) / 未映射字段 才置灰；二程字段一律可编辑
+      const readonly = (!f || t === 17 || t === 13);
+      const isDate = (t === 5) || looksLikeDate(v);
+      let input;
+      if(readonly){
+        const tip = !f
+          ? "表格中未找到「" + c.label + "」列，请在飞书表格新增该列，或到 ⚙ 字段映射 手动指定"
+          : "此字段类型不支持文本编辑（附件/人员）";
+        input = '<input value="' + esc(f ? String(v || "—") : "未映射字段") + '" disabled title="' + esc(tip) + '">';
+      }else if(isDate){
+        // 日期 + 时间选择器（精确到分钟）
+        input = '<input type="datetime-local" data-f="' + esc(f) + '" value="' + esc(toDatetimeLocal(v)) + '">';
+      }else{
+        input = '<input data-f="' + esc(f) + '" value="' + esc(String(v)) + '">';
+      }
+      body += '<div class="detail-cell">' +
+        '<div class="k">' + esc(c.label) + '</div>' +
+        input +
+      '</div>';
+    }
+    body += '</div>';
+  }
+
+  return '<div class="expand-section customer-detail edit-mode">' +
+    '<div class="detail-head">' +
+      '<h4>✎ 编辑并同步到飞书多维表格</h4>' +
+      '<span style="font-size:12px;color:#6b7280">改完点保存，直接写回飞书表格</span>' +
+    '</div>' +
+    '<div class="detail-body">' + body + '</div>' +
+    '<div style="display:flex;gap:10px;margin-top:14px">' +
+      '<button class="btn btn-primary" onclick="saveInlineEdit(\'' + esc(rec.id) + '\')">💾 保存并同步</button>' +
+      '<button class="btn" onclick="cancelInlineEdit()">取消</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function enterInlineEdit(id){ inlineEditingId = id; renderTable(); }
+function cancelInlineEdit(){ inlineEditingId = null; renderTable(); }
+async function saveInlineEdit(id){
+  const rec = DATA.records.find(x => x.id === id); if(!rec) return;
+  const fields = {};
+  document.querySelectorAll('.customer-expand [data-f]').forEach(inp => { fields[inp.getAttribute('data-f')] = inp.value.trim(); });
+  showLoading(true);
+  try{
+    if(String(rec.id).startsWith("demo_")){
+      for(const k in fields) rec.values[k] = fields[k];
+      inlineEditingId = null;
+      renderTable();
+      toast("✅ 已在本地更新（演示模式，未连接飞书）", "ok");
+      return;
+    }
+    const res = await apiFetch(API_BASE + "/api/update", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({record_id:rec.id, fields})});
+    const j = await res.json();
+    if(j.ok){
+      for(const k in fields) rec.values[k] = fields[k];
+      inlineEditingId = null;
+      renderTable();
+      toast("✅ 已同步到飞书多维表格", "ok");
+    }else{
+      toast("❌ 同步失败：" + (j.msg || "未知错误"), "err");
+    }
+  }catch(e){
+    toast("❌ 无法连接本地服务，请确认「启动系统.bat」正在运行", "err");
+  }finally{
+    showLoading(false);
+  }
+}
+
+/* ---------- 详情抽屉 ---------- */
+function openDrawerById(id){
+  const r = DATA.records.find(x=>x.id===id); if(!r) return;
+  drawerRecord=r;
+  document.getElementById("drawerTitle").textContent = "主单号 " + (V(r,"mawb")||"—");
+  document.getElementById("drawerSub").textContent = V(r,"customer")+" · "+V(r,"flight")+" · "+V(r,"flightDate");
+  const mapped = new Set(Object.values(MAPPING));
+  const rows=[];
+  for(const rl of ROLES){
+    if(!MAPPING[rl.key]) continue;
+    let v = V(r,rl.key)||"—";
+    if(rl.key==="pieces"||rl.key==="weight") v = num(v).toLocaleString();
+    rows.push({k:rl.label,v:String(v),full:["anomaly","remark","deadline"].includes(rl.key)});
+  }
+  for(const f of DATA.fields){
+    if(mapped.has(f)) continue;
+    rows.push({k:f,v:String(r.values[f]??"—")||"—",full:true});
+  }
+  const an=isAnomaly(r);
+  document.getElementById("detailGrid").innerHTML =
+    (an?'<div class="detail-item full"><div class="k">⚠ 异常提醒</div><div class="v" style="color:#dc2626">'+esc(anomalyText(r))+'</div></div>':"")+
+    rows.map(x=>'<div class="detail-item'+(x.full?" full":"")+'"><div class="k">'+esc(x.k)+'</div><div class="v">'+esc(x.v)+'</div></div>').join("");
+  // 复位编辑态
+  document.getElementById("detailGrid").style.display="";
+  document.getElementById("editArea").style.display="none";
+  document.getElementById("editBtn").style.display="";
+  document.getElementById("drawer").classList.add("show");
+  document.getElementById("drawerMask").classList.add("show");
+}
+function closeDrawer(){
+  document.getElementById("drawer").classList.remove("show");
+  document.getElementById("drawerMask").classList.remove("show");
+}
+/* ---------- 编辑并同步飞书 ---------- */
+function enterEdit(){
+  if(!drawerRecord) return;
+  const r=drawerRecord;
+  const names = (DATA.fields && DATA.fields.length) ? DATA.fields : Object.keys(r.values);
+  const types = DATA.field_types || {};
+  let html="";
+  for(const f of names){
+    // 附件 / 人员等无法用纯文本编辑的字段，跳过，避免整条写回失败
+    const t = types[f];
+    if(t === 17 || t === 13) continue;
+    const v = r.values[f] ?? "";
+    const input = (t === 5 || looksLikeDate(v))
+      ? '<input type="datetime-local" data-f="'+esc(f)+'" value="'+esc(toDatetimeLocal(v))+'">'
+      : '<input data-f="'+esc(f)+'" value="'+esc(String(v))+'">';
+    html += '<div class="edit-row"><label>'+esc(f)+'</label>'+input+'</div>';
+  }
+  if(!html) html = '<div class="trk-empty">无可编辑的文本字段</div>';
+  document.getElementById("detailGrid").style.display="none";
+  const ea=document.getElementById("editArea");
+  ea.style.display="block";
+  ea.innerHTML = '<div class="edit-head">✎ 编辑并同步到飞书多维表格</div>'+html+
+    '<div style="display:flex;gap:10px;margin-top:14px">'+
+    '<button class="btn btn-primary" onclick="saveEdit()">💾 保存并同步</button>'+
+    '<button class="btn" onclick="exitEdit()">取消</button></div>';
+  document.getElementById("editBtn").style.display="none";
+}
+function exitEdit(){
+  document.getElementById("detailGrid").style.display="";
+  document.getElementById("editArea").style.display="none";
+  document.getElementById("editBtn").style.display="";
+}
+async function saveEdit(){
+  if(!drawerRecord) return;
+  const r=drawerRecord;
+  const fields={};
+  document.querySelectorAll("#editArea [data-f]").forEach(inp=>{ fields[inp.getAttribute("data-f")]=inp.value.trim(); });
+  showLoading(true);
+  try{
+    if(String(r.id).startsWith("demo_")){
+      for(const k in fields) r.values[k]=fields[k];
+      toast("✅ 已在本地更新（演示模式，未连接飞书）","ok");
+      finishEdit(r);
+      return;
+    }
+    const res=await apiFetch(API_BASE+"/api/update",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({record_id:r.id, fields})});
+    const j=await res.json();
+    if(j.ok){
+      for(const k in fields) r.values[k]=fields[k];
+      toast("✅ 已同步到飞书多维表格","ok");
+      finishEdit(r);
+    }else{
+      toast("❌ 同步失败："+(j.msg||"未知错误"),"err");
+    }
+  }catch(e){
+    toast("❌ 无法连接本地服务，请确认「启动系统.bat」正在运行","err");
+  }finally{
+    showLoading(false);
+  }
+}
+function finishEdit(r){
+  exitEdit();
+  renderAll();
+}
+
+/* ---------- 飞书链接 ---------- */
+function openFeishu(){
+  let url = FEISHU_URL;
+  if(drawerRecord && drawerRecord.id && !String(drawerRecord.id).startsWith("demo_")) url += "&record="+drawerRecord.id;
+  window.open(url,"_blank");
+}
+
+/* =====================================================
+   设置弹窗
+===================================================== */
+let settingsTab=0, pendingConfig={};
+async function openSettings(){
+  document.getElementById("settingsMask").classList.add("show");
+  if(location.protocol.startsWith("http")){
+    try{
+      const res=await apiFetch(API_BASE+"/api/config"); const j=await res.json();
+      pendingConfig = j.config||{};
+    }catch(e){ pendingConfig={}; }
+  }else pendingConfig={};
+  switchTab(settingsTab);
+}
+function closeSettings(){ document.getElementById("settingsMask").classList.remove("show"); }
+function switchTab(i){
+  settingsTab=i;
+  document.querySelectorAll(".modal-tab").forEach((el,idx)=>el.classList.toggle("active",idx===i));
+  document.getElementById("saveBtn").style.display = i===0?"":"none";
+  const body=document.getElementById("tabBody");
+  if(i===0) body.innerHTML=tabDataSource();
+  if(i===1) body.innerHTML=tabMapping();
+  if(i===2) body.innerHTML=tabHelp();
+}
+function tabDataSource(){
+  const c=pendingConfig;
+  const live = c.mode==="live";
+  return '<div id="connStatus"></div>'+
+  '<div class="mode-cards">'+
+    '<div class="mode-card'+(!live?" active":"")+'" onclick="setMode(this,\'demo\')"><div class="t">📊 演示数据</div><div class="d">无需任何配置，先体验系统功能</div></div>'+
+    '<div class="mode-card'+(live?" active":"")+'" onclick="setMode(this,\'live\')"><div class="t">✈️ 飞书实时数据</div><div class="d">读取真实多维表格，需填写下方凭证</div></div>'+
+  '</div>'+
+  '<div id="credArea">'+
+    '<div class="form-row"><label>方式一：App ID（推荐，长期有效）</label>'+
+    '<input id="cfgAppId" placeholder="cli_xxxxxxxx" value="'+esc(c.app_id||"")+'">'+
+    '<div class="desc">飞书开放平台 → 开发者后台 → 你的应用 → 凭证与基础信息</div></div>'+
+    '<div class="form-row"><label>App Secret</label>'+
+    '<input id="cfgAppSecret" type="password" placeholder="应用凭证页的一串密钥" value="'+esc(c.app_secret||"")+'"></div>'+
+    '<div class="form-row"><label>方式二：user_access_token（临时令牌）</label>'+
+    '<input id="cfgToken" placeholder="u-xxxx 或 eyJhbGciOi…" value="'+esc(c.token||"")+'">'+
+    '<div class="desc">有效期约 2 小时，过期后需重新获取，适合临时演示</div></div>'+
+    '<div class="help-block help-warn" style="font-size:12px;line-height:1.8">📌 使用 App ID 方式时，请确认已把应用机器人添加为多维表格<b>协作者</b>（表格右上角「···」→ 更多 → 添加文档应用），否则会提示无权限。详细步骤见「连接教程」标签页。</div>'+
+    '<div class="form-row" style="margin-top:14px"><label>网络代理（可选，仅当上网需代理/VPN 时填）</label>'+
+    '<input id="cfgProxy" placeholder="如 http://127.0.0.1:7890（留空则自动读取系统代理）" value="'+esc(c.proxy||"")+'">'+
+    '<div class="desc">若浏览器能打开飞书网页、但本系统连不上（报 WinError 10061），多半是 Python 没走代理。填你代理软件（如 Clash/V2ray/公司 VPN）的本地地址即可，常见端口 7890。不知道就留空，系统会自动尝试系统代理。</div></div>'+
+  '</div>';
+}
+function setMode(el,mode){ pendingConfig.mode=mode; document.querySelectorAll(".mode-card").forEach(x=>x.classList.remove("active")); el.classList.add("active"); }
+function tabMapping(){
+  if(!DATA.fields.length) return '<div class="alert-empty">暂无字段数据</div>';
+  let html='<div class="form-row"><div class="desc" style="margin:0">系统已自动识别表格字段与业务含义的对应关系（下方显示）。如果识别得不對，手动选择正确的字段即可。</div></div><div class="map-grid">';
+  for(const r of ROLES){
+    html+='<div class="map-item"><label>'+r.label+'</label><select onchange="mapOverrideSet(\''+r.key+'\',this.value)">'+
+      '<option value="">（未映射）</option>'+
+      DATA.fields.map(f=>'<option value="'+esc(f)+'"'+(MAPPING[r.key]===f?" selected":"")+'>'+esc(f)+'</option>').join("")+
+      '</select></div>';
+  }
+  return html+'</div><div class="form-row" style="margin-top:14px"><button class="btn" onclick="resetMapping()">恢复自动识别</button> <button class="btn btn-primary" onclick="applyMapping()">应用映射</button></div>';
+}
+function mapOverrideSet(role,field){
+  const o=getOverride(); if(field) o[role]=field; else delete o[role];
+  localStorage.setItem("mapOverride",JSON.stringify(o));
+}
+function resetMapping(){ localStorage.removeItem("mapOverride"); MAPPING=detectMapping(DATA.fields,{}); switchTab(1); renderAll(); toast("已恢复自动识别","ok"); }
+function applyMapping(){ MAPPING=detectMapping(DATA.fields,getOverride()); renderAll(); toast("字段映射已应用","ok"); }
+function tabHelp(){
+  return '<div class="help-steps">'+
+  '<b>目标：</b>让系统直接读取飞书多维表格 <span class="help-code">'+FEISHU_URL.split("?")[0].split("/base/")[1].slice(0,14)+'…</span> 的真实数据。只需做一次，之后全自动。<br><br>'+
+  '<b>方式一：创建自建应用（推荐，一次配置长期有效）</b>'+
+  '<div class="help-block">'+
+  '<span class="num">1</span>电脑浏览器打开 <b>open.feishu.cn</b>，用你的飞书账号登录，点「开发者后台」<br>'+
+  '<span class="num">2</span>点「创建企业自建应用」，名字随意（如"货运查询系统"），创建后进入应用<br>'+
+  '<span class="num">3</span>左侧菜单「权限管理」→ 搜索"多维表格"→ 开通 <b>查看、评论、编辑和管理多维表格</b> 权限<br>'+
+  '<span class="num">4</span>左侧「应用发布」→ 创建版本 → 申请发布（管理员就是你的话直接通过）<br>'+
+  '<span class="num">5</span>回到飞书多维表格 → 右上角「···」→「更多」→「添加文档应用」→ 添加刚创建的应用（权限设为"可编辑"或"可阅读"）<br>'+
+  '<span class="num">6</span>回到本页「数据源」标签，把开发者后台「凭证与基础信息」页的 App ID 和 App Secret 复制粘贴进去，点"保存并测试连接"<br>'+
+  '</div>'+
+  '<b>方式二：临时令牌（适合快速演示，约 2 小时有效）</b>'+
+  '<div class="help-block">'+
+  '<span class="num">1</span>登录 open.feishu.cn → 开发者后台 → 任一应用 → 左侧「开发工具」→「API 调试台」<br>'+
+  '<span class="num">2</span>右上角鉴权方式选「用户身份 user_access_token」→ 点授权登录<br>'+
+  '<span class="num">3</span>复制出现的 token（一长串字符），粘贴到本系统「数据源」页的方式二输入框<br>'+
+  '</div>'+
+  '<div class="help-block help-warn">⚠ 常见问题：<br>• 提示"无权限"（91403/Forbidden）→ 应用没有加为表格协作者，按上面第 5 步操作<br>• App Secret 泄露风险 → 本系统所有数据只存在你自己的电脑里，不经过任何第三方服务器<br>• 双击打开 index.html 时只能看演示数据 → 实时数据需要先双击「启动系统.bat」启动本地服务</div>'+
+  '</div>';
+}
+async function saveConfig(){
+  pendingConfig.app_id=document.getElementById("cfgAppId")?.value.trim()||"";
+  pendingConfig.app_secret=document.getElementById("cfgAppSecret")?.value.trim()||"";
+  pendingConfig.token=document.getElementById("cfgToken")?.value.trim()||"";
+  pendingConfig.proxy=document.getElementById("cfgProxy")?.value.trim()||"";
+  if(!pendingConfig.mode) pendingConfig.mode="live";
+  const st=document.getElementById("connStatus");
+  st.innerHTML='<div class="conn-status conn-info">⏳ 正在连接飞书并测试权限…</div>';
+  try{
+    const res=await apiFetch(API_BASE+"/api/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(pendingConfig)});
+    const j=await res.json();
+    if(j.ok){
+      st.innerHTML='<div class="conn-status conn-ok">✓ 连接成功！已读取到 '+j.record_count+' 条记录，窗口关闭后自动加载飞书数据</div>';
+      setTimeout(()=>{ closeSettings(); loadData(); },900);
+    }else{
+      st.innerHTML='<div class="conn-status conn-err">✕ '+esc(j.msg||"连接失败")+'</div>';
+    }
+  }catch(e){
+    st.innerHTML='<div class="conn-status conn-err">✕ 无法连接本地服务：请先双击「启动系统.bat」（通过浏览器打开 http://localhost:8765 使用本系统），直接双击 index.html 只能使用演示数据</div>';
+  }
+}
+
+/* =====================================================
+   工具
+===================================================== */
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
+function toast(msg,type){
+  const t=document.getElementById("toast");
+  t.textContent=msg; t.className="toast show "+(type||"");
+  clearTimeout(t._tm); t._tm=setTimeout(()=>t.classList.remove("show"),3000);
+}
+function showLoading(b){ document.getElementById("loadingBar").classList.toggle("show",b); }
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){ closeDrawer(); closeSettings(); }
+  if((e.ctrlKey||e.metaKey)&&e.key==="k"){ e.preventDefault(); document.getElementById("globalSearch").focus(); }
+});
+
+/* =====================================================
+   启动
+===================================================== */
+boot();   // 启动：先判断是否需要登录，再加载数据
+</script>
+
+<!-- ===== 登录弹窗 ===== -->
+<div class="login-mask" id="loginMask">
+  <div class="login-card">
+    <div class="login-logo">✈</div>
+    <div class="login-title">航空货运查询系统</div>
+    <div class="login-sub">请输入访问口令后进入</div>
+    <input id="loginUser" class="login-input" type="text" placeholder="账号（默认 admin）" autocomplete="username">
+    <input id="loginPass" class="login-input" type="password" placeholder="访问口令" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    <div class="login-err" id="loginErr"></div>
+    <button class="login-btn" onclick="doLogin()">进入系统</button>
+    <div class="login-foot">口令由管理员在云端后台设置；同事请向管理员索取</div>
+  </div>
+</div>
+
+<script>window.__EMBEDDED_DATA__={"mode": "live", "updated_at": "2026-08-24T09:09:42+0800", "fields": ["主单号", "客户", "代理deadline", "查询状态", "是否分批", "航班号", "飞常准", "deadline校验结果", "ETD", "ATD", "ETA", "ATA", "二程ETD", "二程ATD", "二程ETA", "二程ATA", "航班信息", "启运港", "目的港", "查询完成时间", "截图", "航班信息2", "航线", "是否转运", "冲突备注", "AI分析结果"], "field_types": {"主单号": 1, "客户": 3, "代理deadline": 5, "查询状态": 1, "是否分批": 1, "航班号": 1, "飞常准": 1, "deadline校验结果": 1, "ETD": 5, "ATD": 5, "ETA": 5, "ATA": 5, "二程ETD": 5, "二程ATD": 5, "二程ETA": 5, "二程ATA": 5, "航班信息": 1, "启运港": 1, "目的港": 1, "查询完成时间": 1, "截图": 17, "航班信息2": 17, "航线": 1, "是否转运": 1, "冲突备注": 1, "AI分析结果": 1}, "records": [{"fields": {"AI分析结果": "运单号：020-50673674\n航线：无\n是否转飞：无\n是否分批：无\n头程ETD：无\n头程ETA：无\n头程ATD：无\n头程ATA：无\n二程ETD：无\n二程ETA：无\n二程ATD：无\n二程ATA：无\n航班状态：无\n航班号：无\ndeadline校验结果：无deadline信息，不做比对\n冲突备注：Word文档显示该运单Status: Not Found，且提示Network error，未获取到航线、航班、ETD、ETA、ATD、ATA等信息；截图中另有999-94797113的PVG-JFK/CA1049信息，非本运单020-50673674，未采用。", "ATA": 1787225400000, "ATD": 1787046300000, "ETA": null, "ETD": null, "deadline校验结果": "无deadline信息，不做比对", "主单号": "020-50673674", "二程ATA": null, "二程ATD": null, "二程ETA": null, "二程ETD": null, "代理deadline": null, "冲突备注": "Word文档显示该运单Status: Not Found，且提示Network error，未获取到航线、航班、ETD、ETA、ATD、ATA等信息；截图中另有999-94797113的PVG-JFK/CA1049信息，非本运单020-50673674，未采用。", "启运港": "PEK (Beijing)", "客户": "豪迈", "截图": [{"file_token": "X9aIbg8fkoqGvox9vUGc98BKnFb", "name": "t17_expand_020-50673674.png", "size": 95645, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=X9aIbg8fkoqGvox9vUGc98BKnFb", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/X9aIbg8fkoqGvox9vUGc98BKnFb/download"}], "是否分批": "无", "是否转运": "无", "查询完成时间": "2026-08-21 14:02:47", "查询状态": "delivered", "目的港": "OPO (Porto)", "航班信息": "020-50673674\nNot Found\nAirline\nLufthansa Cargo\nNetwork error, please try again later.\nRefresh", "航班信息2": [{"file_token": "ShfXb3PLToctwoxgHJ0crFHRn9b", "name": "t17_doc_020-50673674.docx", "size": 35440, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=ShfXb3PLToctwoxgHJ0crFHRn9b", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/ShfXb3PLToctwoxgHJ0crFHRn9b/download"}], "航班号": "无", "航线": "无", "飞常准": null}, "id": "recvsNhET2EKzV", "record_id": "recvsNhET2EKzV"}, {"fields": {"AI分析结果": "运单号：999-94797113\n航线：PVG-JFK\n是否转飞：否\n是否分批：否\n头程ETD：无\n头程ETA：无\n头程ATD：2026-08-21 13:40\n头程ATA：2026-08-21 20:29\n二程ETD：无\n二程ETA：无\n二程ATD：无\n二程ATA：无\n航班状态：arrived\n航班号：CA1049\ndeadline校验结果：无deadline信息，不做比对\n冲突备注：无", "ATA": 1787315340000, "ATD": 1787290800000, "ETA": null, "ETD": null, "deadline校验结果": "无deadline信息，不做比对", "主单号": "999-94797113", "二程ATA": null, "二程ATD": null, "二程ETA": null, "二程ETD": null, "代理deadline": null, "冲突备注": "无", "启运港": "PVG (Shanghai)", "客户": "豪迈", "截图": [{"file_token": "UyYrbacCioEzmzxMPupcvaqan4c", "name": "t17_expand_999-94797113.png", "size": 86133, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=UyYrbacCioEzmzxMPupcvaqan4c", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/UyYrbacCioEzmzxMPupcvaqan4c/download"}], "是否分批": "否", "是否转运": "否", "查询完成时间": "2026-08-22 11:01:32", "查询状态": "arrived", "目的港": "JFK (New York City)", "航班信息": "999-94797113\nPick Up Notified\nPVG\n(Shanghai)\nJFK\n(New York City)\nTotal piece\n/\nWeight:\n4 pcs\n/\n1783.0 K\nFlight no.\nCA1049\nDeparture time\nATD\n2026-08-21 13:40\nArrival time\nETA\n--\nPiece\n4 pcs\nLatest event: 2026-08-21 20:29  NFD | 到货通知 约翰·菲茨杰拉德·肯尼迪国际机场JFK | JFK(New York City) | 4 pcs | 1783.00 K\nFlight details\n-\nAirline: Air China Cargo\nPVG > JFK\nCopy details\nCopy link\nTranslate:\nEnglish\nOrigin\tDestination\tFlight no.\tDeparture time\tArrival time\tPiece\tWeight\tStatus\nPVG(Shanghai)\tJFK(New York City)\tCA1049\n--\n2026-08-21 13:40(ATD)\n--\n--\n4\t1783.0\t--\nHistory\nEvent time(Local)\tStatus\tDescription\tStation\tFlight no.\tPiece\tWeight(K)\n2026-08-21 20:29\tNFD\t到货通知 约翰·菲茨杰拉德·肯尼迪国际机场JFK\tJFK(New York City)\t--\t4\t1783.00\n2026-08-21 20:29\tRCF\t货物接收 约翰·菲茨杰拉德·肯尼迪国际机场JFK\tJFK(New York City)\tCA1049\t4\t1783.00\n2026-08-21 14:16\tMAN\t货物预配 上海浦东国际机场PVG\tPVG(Shanghai)\tCA1049\t4\t1783.00\n2026-08-21 13:40\tDEP\t航班离港 上海浦东国际机场PVG\tPVG(Shanghai)\tCA1049\t4\t1783.00\n2026-08-21 12:12\tMAN\t货物预配 上海浦东国际机场PVG\tPVG(Shanghai)\tCA1049\t4\t1783.00\n2026-08-21 10:03\tDIS\t临时拉货 上海浦东国际机场PVG\tPVG(Shanghai)\tCA1049\t4\t1783.00\n2026-08-21 04:15\tRCS\t货物收运 上海浦东国际机场PVG\tPVG(Shanghai)\t--\t4\t1783.00", "航班信息2": [{"file_token": "P8xtbZahbo3jv3x4TLbcAgvAnWf", "name": "t17_doc_999-94797113.docx", "size": 36113, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=P8xtbZahbo3jv3x4TLbcAgvAnWf", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/P8xtbZahbo3jv3x4TLbcAgvAnWf/download"}], "航班号": "CA1049", "航线": "PVG-JFK", "飞常准": "（航班已飞 ATD=2026-08-21 13:40，无需飞常准查询）"}, "id": "recvsNhI58WICr", "record_id": "recvsNhI58WICr"}, {"fields": {"AI分析结果": "运单号：020-25307166\n航线：PVG-FRA-LJU\n是否转飞：是\n是否分批：否\n头程ETD：2026-08-22 10:00\n头程ETA：2026-08-22 16:15\n头程ATD：2026-08-22 09:18\n头程ATA：2026-08-22 16:34\n二程ETD：2026-08-24 06:05\n二程ETA：2026-08-25 06:00\n二程ATD：无\n二程ATA：无\n航班状态：in transit\n航班号：LH8401 / LH7446S / LH7446\ndeadline校验结果：无deadline信息，不做比对\n冲突备注：Word中二程DEP/ARR/RCF在History标记为Planned，未作为二程ATD/ATA；Word航班号字段含二程LH7446S/三程LH7446，History二程计划事件显示LH7446，截图二程显示LH7446S。", "ATA": 1787387640000, "ATD": 1787361480000, "ETA": 1787386500000, "ETD": 1787364000000, "deadline校验结果": "无deadline信息，不做比对", "主单号": "020-25307166", "二程ATA": null, "二程ATD": null, "二程ETA": 1787608800000, "二程ETD": 1787522700000, "代理deadline": null, "冲突备注": "Word中二程DEP/ARR/RCF在History标记为Planned，未作为二程ATD/ATA；Word航班号字段含二程LH7446S/三程LH7446，History二程计划事件显示LH7446，截图二程显示LH7446S。", "启运港": "PVG (Shanghai)", "客户": "海信", "截图": [{"file_token": "YfjcbXLHyoUXrqxMgCXcRm2Anid", "name": "t17_expand_020-25307166.png", "size": 88759, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=YfjcbXLHyoUXrqxMgCXcRm2Anid", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/YfjcbXLHyoUXrqxMgCXcRm2Anid/download"}], "是否分批": "否", "是否转运": "是", "查询完成时间": "2026-08-24 08:30:54", "查询状态": "in transit", "目的港": "LJU (Ljubljana)", "航班信息": "020-25307166\nIn Transit\nPVG\n(Shanghai)\nLJU\n(Ljubljana)\nTotal piece\n/\nWeight:\n4 pcs\n/\n932.0\nFlight no.\nLH7446S\nDeparture time\nSTD\n2026-08-24 06:05\nArrival time\nSTA\n2026-08-25 06:00\nPiece\n4 pcs\nLatest event: 2026-08-25 16:00  DLV | LJU(Ljubljana) | 4 pcs | 932.00\nFlight details\n-\nAirline: Lufthansa Cargo\nPVG > FRA > LJU\nCopy details\nCopy link\nTranslate:\nEnglish\nOrigin\tDestination\tFlight no.\tDeparture time\tArrival time\tPiece\tWeight\tStatus\nFRA(Frankfurt)\tLJU(Ljubljana)\tLH7446S\n2026-08-24 06:05(STD)\n--\n2026-08-25 06:00(STA)\n--\n4\t932.0\t--\nPVG(Shanghai)\tFRA(Frankfurt)\tLH8401\n2026-08-22 10:00(ETD)\n2026-08-22 09:18(ATD)\n2026-08-22 16:15(ETA)\n2026-08-22 16:34(ATA)\n4\t932.0\t--\nHistory\nEvent time(Local)\tStatus\tDescription\tStation\tFlight no.\tPiece\tWeight\n2026-08-25 16:00\tDLV\t[Planned]--\tLJU(Ljubljana)\t--\t4\t932.00\n2026-08-25 16:00\tNFD\t[Planned]--\tLJU(Ljubljana)\t--\t4\t932.00\n2026-08-25 10:24\tRCF\t[Planned]--\tLJU(Ljubljana)\tLH7446\t4\t932.00\n2026-08-25 06:00\tARR\t[Planned]--\tLJU(Ljubljana)\tLH7446\t4\t932.00\n2026-08-24 06:05\tDEP\t[Planned]--\tFRA(Frankfurt)\tLH7446\t4\t932.00\n2026-08-24 04:53\tMAN\t[Planned]--\tFRA(Frankfurt)\tLH7446\t4\t932.00\n2026-08-23 17:11\tRCF\t--\tFRA(Frankfurt)\tLH8401\t4\t932.00\n2026-08-22 16:34\tARR\t--\tFRA(Frankfurt)\tLH8401\t4\t932.00\n2026-08-22 09:18\tDEP\t--\tPVG(Shanghai)\tLH8401\t4\t932.00\n2026-08-22 08:20\tMAN\t--\tPVG(Shanghai)\tLH8401\t4\t0.00\n2026-08-19 21:39\tRCS\t--\tPVG(Shanghai)\t--\t4\t0.00\n2026-08-19 18:51\tBKD\t--\tPVG(Shanghai)\t--\t4\t932.00", "航班信息2": [{"file_token": "Ck4ObiSORosFabxkIsrcaeZ9nEd", "name": "t17_doc_020-25307166.docx", "size": 36103, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=Ck4ObiSORosFabxkIsrcaeZ9nEd", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/Ck4ObiSORosFabxkIsrcaeZ9nEd/download"}], "航班号": "LH8401 / LH7446S / LH7446", "航线": "PVG-FRA-LJU", "飞常准": "（航班已飞 ATD=2026-08-22 09:18，无需飞常准查询）"}, "id": "recvsNhKoHpIhg", "record_id": "recvsNhKoHpIhg"}, {"fields": {"AI分析结果": "运单号：235-96625712\n航线：CGO-IST-CDG\n是否转飞：是\n是否分批：否\n头程ETD：2026-08-21 04:20\n头程ETA：2026-08-21 12:25\n头程ATD：无\n头程ATA：2026-08-22 05:35\n二程ETD：2026-08-22 15:30\n二程ETA：2026-08-22 18:10\n二程ATD：2026-08-22 15:45\n二程ATA：2026-08-23 00:37\n航班状态：arrived\n航班号：TK6317 / TK1827\ndeadline校验结果：无deadline信息，不做比对\n冲突备注：Word未提供ETD/ETA，头程及二程ETD/ETA取自截图；头程ATD在Word及截图均无DEP记录，填无；Word与截图未见冲突。", "ATA": 1787348100000, "ATD": 1787257200000, "ETA": 1787286300000, "ETD": 1787257200000, "deadline校验结果": "无deadline信息，不做比对", "主单号": "235-96625712", "二程ATA": 1787416620000, "二程ATD": 1787384700000, "二程ETA": 1787393400000, "二程ETD": 1787383800000, "代理deadline": null, "冲突备注": "Word未提供ETD/ETA，头程及二程ETD/ETA取自截图；头程ATD在Word及截图均无DEP记录，填无；Word与截图未见冲突。", "启运港": "CGO (Zhengzhou)", "客户": "德诚宝", "截图": [{"file_token": "JxpdbNBOqoUZByx8jXWcmxNtnPg", "name": "t17_expand_235-96625712.png", "size": 97176, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=JxpdbNBOqoUZByx8jXWcmxNtnPg", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/JxpdbNBOqoUZByx8jXWcmxNtnPg/download"}], "是否分批": "否", "是否转运": "是", "查询完成时间": "2026-08-23 08:58:00", "查询状态": "arrived", "目的港": "CDG (Paris)", "航班信息": "235-96625712\nPick Up Notified\nCGO\n(Zhengzhou)\nCDG\n(Paris)\nTotal piece\n/\nWeight:\n3 pcs\n/\n295.0 kg\nFlight no.\nTK6317\nDeparture time\nATD\n--\nArrival time\nATA\n2026-08-22 05:35\nPiece\n3 pcs\nLatest event: 2026-08-23 00:38  NFD | Shipment Notified For Delivery | CDG(Paris) | 3 pcs | 295.00 kg\nFlight details\n-\nAirline: Turkish Airlines\nCGO > IST > CDG\nCopy details\nCopy link\nTranslate:\nEnglish\nOrigin\tDestination\tFlight no.\tDeparture time\tArrival time\tPiece\tWeight\tStatus\nIST(Istanbul)\tCDG(Paris)\tTK1827\n2026-08-22 15:30(ETD)\n2026-08-22 15:45(ATD)\n2026-08-22 18:10(ETA)\n--\n3\t295.0\t--\nCGO(Zhengzhou)\tIST(Istanbul)\tTK6317\n2026-08-21 04:20(ETD)\n--\n2026-08-21 12:25(ETA)\n2026-08-22 05:35(ATA)\n3\t295.0\t--\nHistory\nEvent time(Local)\tStatus\tDescription\tStation\tFlight no.\tPiece\tWeight(kg)\n2026-08-23 00:38\tNFD\tShipment Notified For Delivery\tCDG(Paris)\t--\t3\t295.00\n2026-08-23 00:37\tRCF\tShipment Received From Flight\tCDG(Paris)\tTK1827\t3\t295.00\n2026-08-22 15:45\tDEP\tShipment Departed\tIST(Istanbul)\tTK1827\t3\t295.00\n2026-08-22 09:40\tRCF\tShipment Received From Flight\tIST(Istanbul)\tTK6317\t3\t295.00\n2026-08-22 09:14\tBKD\tShipment Booked\tIST(Istanbul)\tTK1827\t3\t295.00\n2026-08-22 05:35\tARR\tShipment Arrived\tIST(Istanbul)\tTK6317\t3\t295.00\n2026-08-22 09:14\tBKD\tShipment Booked\tCGO(Zhengzhou)\tTK6317\t3\t295.00\n2026-08-20 17:21\tRCS\tShipment Accepted\tCGO(Zhengzhou)\t--\t3\t295.00", "航班信息2": [{"file_token": "NW7Rbci9roA0OkxDNMGctxm4nnh", "name": "t17_doc_235-96625712.docx", "size": 36060, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=NW7Rbci9roA0OkxDNMGctxm4nnh", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/NW7Rbci9roA0OkxDNMGctxm4nnh/download"}], "航班号": "TK6317 / TK1827", "航线": "CGO-IST-CDG", "飞常准": "飞常准查询（TK6317 / 2026-08-21）：未找到该航班（飞常准暂无数据，请确认航班号与日期）"}, "id": "recvsNhOYEJmV6", "record_id": "recvsNhOYEJmV6"}, {"fields": {"AI分析结果": "运单号：131-05708640\n航线：SHA-HND-HEL-WAW\n是否转飞：是\n是否分批：是\n头程ETD：无\n头程ETA：无\n头程ATD：2026-08-18 08:07\n头程ATA：无\n二程ETD：无\n二程ETA：2026-08-21 14:56\n二程ATD：2026-08-21 07:49\n二程ATA：无\n航班状态：in transit\n航班号：FM815 / JL047 / JL9659\ndeadline校验结果：无deadline信息，不做比对\n冲突备注：Word显示Status: Not Found且Network error，未提供航班时间；截图显示In Transit并提供航段信息，因Word无有效航班时间，采用截图。判定分批原因：同一运单下航段件数不一致，截图总件重为4 pcs/1110.0 KGS，但SHA-HND航段FM815显示8 pcs，HND-HEL航段JL047显示4 pcs，HEL-WAW航段JL9659显示4 pcs；各航段重量明细均为--。分批/航段明细：SHA-HND，FM815，8 pcs，重量--，ATD 2026-08-18 08:07，ATA 2026-08-18 12:04；HND-HEL，JL047，4 pcs，重量--，ATD 2026-08-21 07:49，ETA 2026-08-21 14:56，ATA无；HEL-WAW，JL9659，4 pcs，重量--，ETD 2026-08-22 13:00，ETA 2026-08-24 16:00，ATD无，ATA无；HEL-WAW为第三航段，输出字段无三程栏位，故写入备注。Final目的港WAW实际到港/RCF未提供，Planned/ETA未作为ATA。", "ATA": null, "ATD": 1787011620000, "ETA": 1787558400000, "ETD": 1787374800000, "deadline校验结果": "无deadline信息，不做比对", "主单号": "131-05708640", "二程ATA": null, "二程ATD": 1787269740000, "二程ETA": 1787295360000, "二程ETD": 1787374800000, "代理deadline": null, "冲突备注": "Word显示Status: Not Found且Network error，未提供航班时间；截图显示In Transit并提供航段信息，因Word无有效航班时间，采用截图。判定分批原因：同一运单下航段件数不一致，截图总件重为4 pcs/1110.0 KGS，但SHA-HND航段FM815显示8 pcs，HND-HEL航段JL047显示4 pcs，HEL-WAW航段JL9659显示4 pcs；各航段重量明细均为--。分批/航段明细：SHA-HND，FM815，8 pcs，重量--，ATD 2026-08-18 08:07，ATA 2026-08-18 12:04；HND-HEL，JL047，4 pcs，重量--，ATD 2026-08-21 07:49，ETA 2026-08-21 14:56，ATA无；HEL-WAW，JL9659，4 pcs，重量--，ETD 2026-08-22 13:00，ETA 2026-08-24 16:00，ATD无，ATA无；HEL-WAW为第三航段，输出字段无三程栏位，故写入备注。Final目的港WAW实际到港/RCF未提供，Planned/ETA未作为ATA。", "启运港": "SHA (Shanghai)", "客户": "超达", "截图": [{"file_token": "SbpjbJk6koxZp0xqSX4c5f0dnJg", "name": "t17_expand_131-05708640.png", "size": 71630, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=SbpjbJk6koxZp0xqSX4c5f0dnJg", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/SbpjbJk6koxZp0xqSX4c5f0dnJg/download"}], "是否分批": "是", "是否转运": "是", "查询完成时间": "2026-08-24 08:30:54", "查询状态": "Not Found", "目的港": "WAW (Warsaw)", "航班信息": "131-05708640\nNot Found\nAirline\nJapan Airlines\nNetwork error, please try again later.\nRefresh", "航班信息2": [{"file_token": "JEm7bpcLroSa9AxPJZ7cygNRn3e", "name": "t17_doc_131-05708640.docx", "size": 35435, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=JEm7bpcLroSa9AxPJZ7cygNRn3e", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/JEm7bpcLroSa9AxPJZ7cygNRn3e/download"}], "航班号": "FM815 / JL047 / JL9659", "航线": "SHA-HND-HEL-WAW", "飞常准": "（无航班号，跳过飞常准查询）"}, "id": "recvsNhR9CB1xK", "record_id": "recvsNhR9CB1xK"}, {"fields": {"AI分析结果": "运单号：112-09848403\n航线：PVG-CPH\n是否转飞：否\n是否分批：否\n头程ETD：2026-08-17 22:57\n头程ETA：2026-08-17 23:19\n头程ATD：2026-08-20 13:24\n头程ATA：2026-08-21 08:04\n二程ETD：无\n二程ETA：无\n二程ATD：无\n二程ATA：无\n航班状态：arrived\n航班号：MU707\ndeadline校验结果：无deadline信息，不做比对\n冲突备注：Word无明确ETD/ETA/DEP事件，头程ETD/ETA/ATD取自截图；Word目的港CPH存在RCF入库时间2026-08-21 08:04，按规则头程ATA取Word RCF。截图显示ATA为2026-08-20 08:06，与Word RCF时间不一致，以Word为准。", "ATA": 1787270640000, "ATD": 1787203440000, "ETA": 1786979940000, "ETD": 1786978620000, "deadline校验结果": "无deadline信息，不做比对", "主单号": "112-09848403", "二程ATA": null, "二程ATD": null, "二程ETA": null, "二程ETD": null, "代理deadline": null, "冲突备注": "Word无明确ETD/ETA/DEP事件，头程ETD/ETA/ATD取自截图；Word目的港CPH存在RCF入库时间2026-08-21 08:04，按规则头程ATA取Word RCF。截图显示ATA为2026-08-20 08:06，与Word RCF时间不一致，以Word为准。", "启运港": "PVG (Shanghai)", "客户": "超达", "截图": [{"file_token": "U26Yb7iFWoUjxjxXoMUcrbF0nDd", "name": "t17_expand_112-09848403.png", "size": 96186, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=U26Yb7iFWoUjxjxXoMUcrbF0nDd", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/U26Yb7iFWoUjxjxXoMUcrbF0nDd/download"}], "是否分批": "否", "是否转运": "否", "查询完成时间": "2026-08-21 14:02:47", "查询状态": "arrived", "目的港": "CPH (Copenhagen)", "航班信息": "112-09848403\nArrived\nPVG\n(Shanghai)\nCPH\n(Copenhagen)\nTotal piece\n/\nWeight:\n2 pcs\n/\n515.0\nFlight no.\nMU707\nDeparture time\nATD\n2026-08-20 13:24\nArrival time\nATA\n2026-08-20 08:06\nPiece\n2 pcs\nLatest event: 2026-08-21 08:04  RCF | 实际理货件数：【2】件，实际理货重量：【515】公斤。 | CPH(Copenhagen) | MU707 | 2 pcs | 515.00\nFlight details\n-\nAirline: China Cargo Airlines\nPVG > CPH\nCopy details\nCopy link\nTranslate:\nEnglish\nOrigin\tDestination\tFlight no.\tDeparture time\tArrival time\tPiece\tWeight\tStatus\nPVG(Shanghai)\tCPH(Copenhagen)\tMU707\n2026-08-17 22:57(STD)\n2026-08-20 13:24(ATD)\n2026-08-17 23:19(STA)\n2026-08-20 08:06(ATA)\n2\t515.0\tNFD\nHistory\nEvent time(Local)\tStatus\tDescription\tStation\tFlight no.\tPiece\tWeight\n2026-08-21 08:04\tRCF\t实际理货件数：【2】件，实际理货重量：【515】公斤。\tCPH(Copenhagen)\tMU707\t2\t515.00\n2026-08-21 08:01\tBKD\t核单件数：【2】件，核单重量：【515】公斤。\tCPH(Copenhagen)\tMU707\t2\t515.00\n2026-08-20 13:36\tRCS\t板箱号：PMC48237MU,组装件数：2件，组装重量：515公斤。\tPVG(Shanghai)\tMU707\t2\t515.00\n2026-08-18 02:07\tBKD\t收单状态：收单通过，收单件数2件，收单重量515公斤。\tPVG(Shanghai)\tMU707\t2\t515.00\n2026-08-17 22:57\tCCD\t分单号：TAOW044452，放行时间：2026-08-17，放行结果：海关放行，放行2件，515.0公斤。\tPVG(Shanghai)\tMU707\t2\t515.00\n2026-08-17 22:55\tBKD\t分单号：TAOW044452，航班号：MU707，航班日期：2026-08-18，运抵件数：2件，运抵重量：515公斤。\tPVG(Shanghai)\tMU707\t2\t515.00", "航班信息2": [{"file_token": "KxPSbSmJ1oXr93xwLbOc3Q7EnPh", "name": "t17_doc_112-09848403.docx", "size": 36185, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=KxPSbSmJ1oXr93xwLbOc3Q7EnPh", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/KxPSbSmJ1oXr93xwLbOc3Q7EnPh/download"}], "航班号": "MU707", "航线": "PVG-CPH", "飞常准": null}, "id": "recvsNhRwVO5qc", "record_id": "recvsNhRwVO5qc"}, {"fields": {"AI分析结果": "运单号：131-05743592\n航线：SHA-HND-HEL-WAW\n是否转飞：是\n是否分批：否\n头程ETD：无\n头程ETA：2026-08-20 16:40\n头程ATD：2026-08-20 12:42\n头程ATA：无\n二程ETD：2026-08-22 07:50\n二程ETA：2026-08-22 15:10\n二程ATD：无\n二程ATA：无\n航班状态：in transit\n航班号：JL082 / JL047\ndeadline校验结果：无deadline信息，不做比对\n冲突备注：航班文件显示Status: Not Found且Network error，无可用航班明细；截图显示In Transit并提供航班明细，已按截图提取。截图顶部航线为SHA-WAW，但航班明细仅显示SHA-HND、HND-HEL，未显示HEL-WAW末程航班及时间信息；截图仅有头程ATD，无ATA；二程仅有ETD/ETA，无ATD/ATA。", "ATA": 1787382600000, "ATD": 1787200920000, "ETA": 1787215200000, "ETD": 1787356200000, "deadline校验结果": "无deadline信息，不做比对", "主单号": "131-05743592", "二程ATA": null, "二程ATD": null, "二程ETA": 1787382600000, "二程ETD": 1787356200000, "代理deadline": null, "冲突备注": "航班文件显示Status: Not Found且Network error，无可用航班明细；截图显示In Transit并提供航班明细，已按截图提取。截图顶部航线为SHA-WAW，但航班明细仅显示SHA-HND、HND-HEL，未显示HEL-WAW末程航班及时间信息；截图仅有头程ATD，无ATA；二程仅有ETD/ETA，无ATD/ATA。", "启运港": "SHA (Shanghai)", "客户": "超达", "截图": [{"file_token": "Hu2VbTmiDoHifQxzEQGcS3wonsh", "name": "t17_expand_131-05743592.png", "size": 74317, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=Hu2VbTmiDoHifQxzEQGcS3wonsh", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/Hu2VbTmiDoHifQxzEQGcS3wonsh/download"}], "是否分批": "否", "是否转运": "是", "查询完成时间": "2026-08-24 08:30:54", "查询状态": "Not Found", "目的港": "WAW (Warsaw)", "航班信息": "131-05743592\nNot Found\nAirline\nJapan Airlines\nNetwork error, please try again later.\nRefresh", "航班信息2": [{"file_token": "MWEKbKiasov5dNxlUyAcmFF6n0f", "name": "t17_doc_131-05743592.docx", "size": 35436, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=MWEKbKiasov5dNxlUyAcmFF6n0f", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/MWEKbKiasov5dNxlUyAcmFF6n0f/download"}], "航班号": "JL082 / JL047", "航线": "SHA-HND-HEL-WAW", "飞常准": "（无航班号，跳过飞常准查询）"}, "id": "recvsNhU8L0H4F", "record_id": "recvsNhU8L0H4F"}, {"fields": {"AI分析结果": "运单号：235-96777855\n航线：CGO-IST-PRG\n是否转飞：是\n是否分批：是\n头程ETD：2026-08-19 04:15\n头程ETA：2026-08-19 12:20\n头程ATD：2026-08-19 09:06\n头程ATA：2026-08-19 20:59\n二程ETD：2026-08-22 06:30\n二程ETA：2026-08-23 15:10\n二程ATD：2026-08-22 06:38\n二程ATA：无\n航班状态：in transit\n航班号：TK6211 / TK6509\ndeadline校验结果：无deadline信息，不做比对\n冲突备注：分批原因：同一运单6件365.00kg在二程IST-PRG拆分为两批3件182.50kg运输。批次明细：头程CGO-IST TK6211，6件365.00kg，实际起飞2026-08-19 09:06，实际到达/RCF IST 2026-08-19 20:59；二程批次1 IST-PRG TK6509，3件182.50kg，实际起飞2026-08-22 06:38，实际到达/RCF PRG 2026-08-23 07:07；二程批次2 IST-PRG TK6509，3件182.50kg，实际起飞2026-08-23 13:32，未见目的港实际到达/RCF，故二程ATA填无。ETD/ETA Word未提供，取自截图；截图未完整显示Word中的TK6509 2026-08-23 13:32实际DEP，实际时间以Word为准。", "ATA": 1787144340000, "ATD": 1787101560000, "ETA": 1787113200000, "ETD": 1787084100000, "deadline校验结果": "无deadline信息，不做比对", "主单号": "235-96777855 ", "二程ATA": 1787440020000, "二程ATD": 1787351880000, "二程ETA": 1787469000000, "二程ETD": 1787351400000, "代理deadline": null, "冲突备注": "分批原因：同一运单6件365.00kg在二程IST-PRG拆分为两批3件182.50kg运输。批次明细：头程CGO-IST TK6211，6件365.00kg，实际起飞2026-08-19 09:06，实际到达/RCF IST 2026-08-19 20:59；二程批次1 IST-PRG TK6509，3件182.50kg，实际起飞2026-08-22 06:38，实际到达/RCF PRG 2026-08-23 07:07；二程批次2 IST-PRG TK6509，3件182.50kg，实际起飞2026-08-23 13:32，未见目的港实际到达/RCF，故二程ATA填无。ETD/ETA Word未提供，取自截图；截图未完整显示Word中的TK6509 2026-08-23 13:32实际DEP，实际时间以Word为准。", "启运港": "CGO (Zhengzhou)", "客户": "银宝山新", "截图": [{"file_token": "D78ibxVkmozD8exAV64cSvXUnZc", "name": "t17_expand_235-96777855.png", "size": 99028, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=D78ibxVkmozD8exAV64cSvXUnZc", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/D78ibxVkmozD8exAV64cSvXUnZc/download"}], "是否分批": "是", "是否转运": "是", "查询完成时间": "2026-08-24 08:30:54", "查询状态": "in transit", "目的港": "PRG (Prague)", "航班信息": "235-96777855\nIn Transit\nCGO\n(Zhengzhou)\nPRG\n(Prague)\nTotal piece\n/\nWeight:\n6 pcs\nFHL\n/\n365.0 kg\nFlight no.\nTK6509\nDeparture time\nATD\n2026-08-22 06:38\nArrival time\nETA\n2026-08-23 15:10\nPiece\n3 pcs\nLatest event: 2026-08-23 13:32  DEP | Shipment Departed | IST(Istanbul) | TK6509 | 3 pcs | 182.50 kg\nFlight details\n-\nAirline: Turkish Airlines\nCGO > IST > PRG\nCopy details\nCopy link\nTranslate:\nEnglish\nOrigin\tDestination\tFlight no.\tDeparture time\tArrival time\tPiece\tWeight\tStatus\nIST(Istanbul)\tPRG(Prague)\tTK6509\n2026-08-23 13:35(ETD)\n2026-08-22 06:38(ATD)\n2026-08-23 15:10(ETA)\n--\n3\t182.5\t--\nIST(Istanbul)\tPRG(Prague)\tTK6509\n2026-08-22 06:30(ETD)\n2026-08-22 06:38(ATD)\n2026-08-22 08:05(ETA)\n--\n3\t182.5\t--\nCGO(Zhengzhou)\tIST(Istanbul)\tTK6211\n2026-08-19 04:15(ETD)\n2026-08-19 09:06(ATD)\n2026-08-19 12:20(ETA)\n--\n6\t365.0\t--\nHistory\nEvent time(Local)\tStatus\tDescription\tStation\tFlight no.\tPiece\tWeight(kg)\n2026-08-23 13:32\tDEP\tShipment Departed\tIST(Istanbul)\tTK6509\t3\t182.50\n2026-08-23 07:07\tRCF\tShipment Received From Flight\tPRG(Prague)\tTK6509\t3\t182.50\n2026-08-22 13:53\tBKD\tShipment Booked\tIST(Istanbul)\tTK6509\t3\t182.50\n2026-08-22 13:53\tBKD\tShipment Booked\tIST(Istanbul)\tTK6509\t3\t182.50\n2026-08-22 13:53\tBKD\tShipment Booked\tCGO(Zhengzhou)\tTK6211\t6\t365.00\n2026-08-22 06:38\tDEP\tShipment Departed\tIST(Istanbul)\tTK6509\t3\t182.50\n2026-08-19 20:59\tRCF\tShipment Received From Flight\tIST(Istanbul)\tTK6211\t6\t365.00\n2026-08-19 09:06\tDEP\tShipment Departed\tCGO(Zhengzhou)\tTK6211\t6\t365.00\n2026-08-18 18:42\tRCS\tShipment Accepted\tCGO(Zhengzhou)\t--\t6\t365.00", "航班信息2": [{"file_token": "C7zqbr3TroK4cBx74JgcRKJenje", "name": "t17_doc_235-96777855.docx", "size": 36062, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=C7zqbr3TroK4cBx74JgcRKJenje", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/C7zqbr3TroK4cBx74JgcRKJenje/download"}], "航班号": "TK6211 / TK6509", "航线": "CGO-IST-PRG", "飞常准": "（航班已飞 ATD=2026-08-19 09:06，无需飞常准查询）"}, "id": "recvsNhWQf4Mwb", "record_id": "recvsNhWQf4Mwb"}, {"fields": {"AI分析结果": "运单号：235-96793384\n航线：PVG-IST-MAD\n是否转飞：是\n是否分批：否\n头程ETD：2026-08-16 22:25\n头程ETA：2026-08-17 05:25\n头程ATD：2026-08-16 22:56\n头程ATA：2026-08-17 15:20\n二程ETD：2026-08-19 04:05\n二程ETA：2026-08-19 07:30\n二程ATD：无\n二程ATA：2026-08-20 21:23\n航班状态：arrived\n航班号：TK0027/TK6467\ndeadline校验结果：无deadline信息，不做比对\n冲突备注：Word中MAD目的港同航班TK6467存在两条ARR记录：2026-08-19 07:30、2026-08-20 21:23，件重均为3件/277.00kg，未判定分批，目的港实际到达取较晚ARR 2026-08-20 21:23；截图将2026-08-19 07:30标为ETA、2026-08-20 21:23标为ATA，与Word中2026-08-19 07:30标为ARR不一致，以Word为准；截图未显示头程实际到达ATA和二程实际起飞ATD。", "ATA": 1786951200000, "ATD": 1786892160000, "ETA": 1786915500000, "ETD": 1786890300000, "deadline校验结果": "无deadline信息，不做比对", "主单号": "235-96793384", "二程ATA": 1787232180000, "二程ATD": null, "二程ETA": 1787095800000, "二程ETD": 1787083500000, "代理deadline": null, "冲突备注": "Word中MAD目的港同航班TK6467存在两条ARR记录：2026-08-19 07:30、2026-08-20 21:23，件重均为3件/277.00kg，未判定分批，目的港实际到达取较晚ARR 2026-08-20 21:23；截图将2026-08-19 07:30标为ETA、2026-08-20 21:23标为ATA，与Word中2026-08-19 07:30标为ARR不一致，以Word为准；截图未显示头程实际到达ATA和二程实际起飞ATD。", "启运港": "PVG (Shanghai)", "客户": "海泰科", "截图": [{"file_token": "MZuVbvUU0oWmDzxU6o8cf8p9nrf", "name": "t17_expand_235-96793384.png", "size": 97360, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=MZuVbvUU0oWmDzxU6o8cf8p9nrf", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/MZuVbvUU0oWmDzxU6o8cf8p9nrf/download"}], "是否分批": "否", "是否转运": "是", "查询完成时间": "2026-08-21 14:02:47", "查询状态": "arrived", "目的港": "MAD (Madrid)", "航班信息": "235-96793384\nPick Up Notified\nPVG\n(Shanghai)\nMAD\n(Madrid)\nTotal piece\n/\nWeight:\n3 pcs\n/\n277.0 kg\nFlight no.\nTK6467\nDeparture time\nATD\n--\nArrival time\nATA\n2026-08-20 21:23\nPiece\n3 pcs\nLatest event: 2026-08-20 21:25  NFD | Shipment Notified For Delivery | MAD(Madrid) | 3 pcs | 277.00 kg\nFlight details\n-\nAirline: Turkish Airlines\nPVG > IST > MAD\nCopy details\nCopy link\nTranslate:\nEnglish\nOrigin\tDestination\tFlight no.\tDeparture time\tArrival time\tPiece\tWeight\tStatus\nIST(Istanbul)\tMAD(Madrid)\tTK6467\n2026-08-19 04:05(ETD)\n--\n2026-08-19 07:30(ETA)\n2026-08-20 21:23(ATA)\n3\t277.0\t--\nPVG(Shanghai)\tIST(Istanbul)\tTK0027\n2026-08-16 22:25(ETD)\n2026-08-16 22:56(ATD)\n2026-08-17 05:25(ETA)\n--\n3\t277.0\t--\nHistory\nEvent time(Local)\tStatus\tDescription\tStation\tFlight no.\tPiece\tWeight(kg)\n2026-08-20 21:25\tNFD\tShipment Notified For Delivery\tMAD(Madrid)\t--\t3\t277.00\n2026-08-20 21:23\tARR\tShipment Arrived\tMAD(Madrid)\tTK6467\t3\t277.00\n2026-08-19 07:30\tARR\tShipment Arrived\tMAD(Madrid)\tTK6467\t3\t277.00\n2026-08-18 15:29\tBKD\tShipment Booked\tIST(Istanbul)\tTK6467\t3\t277.00\n2026-08-18 15:29\tBKD\tShipment Booked\tPVG(Shanghai)\tTK0027\t3\t277.00\n2026-08-17 15:20\tRCF\tShipment Received From Flight\tIST(Istanbul)\tTK0027\t3\t277.00\n2026-08-16 22:56\tDEP\tShipment Departed\tPVG(Shanghai)\tTK0027\t3\t277.00\n2026-08-16 13:17\tRCS\tShipment Accepted\tPVG(Shanghai)\t--\t3\t277.00", "航班信息2": [{"file_token": "IHnmblcUrocJn7xaXYxcBTghn2d", "name": "t17_doc_235-96793384.docx", "size": 36056, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=IHnmblcUrocJn7xaXYxcBTghn2d", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/IHnmblcUrocJn7xaXYxcBTghn2d/download"}], "航班号": "TK0027/TK6467", "航线": "PVG-IST-MAD", "飞常准": null}, "id": "recvsNhZ5YFXxg", "record_id": "recvsNhZ5YFXxg"}, {"fields": {"AI分析结果": null, "ATA": null, "ATD": null, "ETA": null, "ETD": null, "deadline校验结果": null, "主单号": "014-24702554", "二程ATA": null, "二程ATD": null, "二程ETA": null, "二程ETD": null, "代理deadline": null, "冲突备注": null, "启运港": null, "客户": "中誉", "截图": null, "是否分批": null, "是否转运": null, "查询完成时间": "2026-08-24 08:30:54", "查询状态": "Tracking...", "目的港": null, "航班信息": "014-24702554\nTracking...\nTracking, please wait a moment…", "航班信息2": [{"file_token": "NKbzbSMbToaif9x0ji1cea8Vnyb", "name": "t17_doc_014-24702554.docx", "size": 35405, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=NKbzbSMbToaif9x0ji1cea8Vnyb", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/NKbzbSMbToaif9x0ji1cea8Vnyb/download"}], "航班号": null, "航线": null, "飞常准": "（无航班号，跳过飞常准查询）"}, "id": "recvsNi1d0Rd4l", "record_id": "recvsNi1d0Rd4l"}, {"fields": {"AI分析结果": "运单号：235-96793395\n航线：PVG-IST-PTY\n是否转飞：是\n是否分批：否\n头程ETD：2026-08-21 04:50\n头程ETA：2026-08-21 11:25\n头程ATD：2026-08-21 05:33\n头程ATA：2026-08-21 11:25\n二程ETD：2026-08-22 14:55\n二程ETA：2026-08-22 20:25\n二程ATD：2026-08-22 15:00\n二程ATA：2026-08-22 21:00\n航班状态：arrived\n航班号：TK6591 / TK0903\ndeadline校验结果：无deadline信息，不做比对\n冲突备注：无", "ATA": 1787282700000, "ATD": 1787261580000, "ETA": 1787282700000, "ETD": 1787259000000, "deadline校验结果": "无deadline信息，不做比对", "主单号": "235-96793395", "二程ATA": 1787403600000, "二程ATD": 1787382000000, "二程ETA": 1787401500000, "二程ETD": 1787381700000, "代理deadline": null, "冲突备注": "无", "启运港": "PVG (Shanghai)", "客户": "海信", "截图": [{"file_token": "Fc5AbCPSxoqgJgxxhA0c880Un4e", "name": "t17_expand_235-96793395.png", "size": 100788, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=Fc5AbCPSxoqgJgxxhA0c880Un4e", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/Fc5AbCPSxoqgJgxxhA0c880Un4e/download"}], "是否分批": "否", "是否转运": "是", "查询完成时间": "2026-08-23 10:03:15", "查询状态": "arrived", "目的港": "PTY (Panama City)", "航班信息": "235-96793395\nPick Up Notified\nPVG\n(Shanghai)\nPTY\n(Panama City)\nTotal piece\n/\nWeight:\n1 pcs\n/\n169.0 kg\nFlight no.\nTK0903\nDeparture time\nATD\n2026-08-22 15:00\nArrival time\nETA\n2026-08-22 20:25\nPiece\n1 pcs\nLatest event: 2026-08-22 21:00  NFD | Shipment Notified For Delivery | PTY(Panama City) | 1 pcs | 169.00 kg\nFlight details\n-\nAirline: Turkish Airlines\nPVG > IST > PTY\nCopy details\nCopy link\nTranslate:\nEnglish\nOrigin\tDestination\tFlight no.\tDeparture time\tArrival time\tPiece\tWeight\tStatus\nIST(Istanbul)\tPTY(Panama City)\tTK0903\n2026-08-22 14:55(ETD)\n2026-08-22 15:00(ATD)\n2026-08-22 20:25(ETA)\n--\n1\t169.0\t--\nPVG(Shanghai)\tIST(Istanbul)\tTK6591\n2026-08-21 04:50(ETD)\n2026-08-21 05:33(ATD)\n2026-08-21 11:25(ETA)\n2026-08-21 11:25(ATA)\n1\t169.0\t--\nHistory\nEvent time(Local)\tStatus\tDescription\tStation\tFlight no.\tPiece\tWeight(kg)\n2026-08-22 21:00\tNFD\tShipment Notified For Delivery\tPTY(Panama City)\t--\t1\t169.00\n2026-08-22 21:00\tRCF\tShipment Received From Flight\tPTY(Panama City)\tTK0903\t1\t169.00\n2026-08-22 15:00\tDEP\tShipment Departed\tIST(Istanbul)\tTK0903\t1\t169.00\n2026-08-21 15:44\tRCF\tShipment Received From Flight\tIST(Istanbul)\tTK6591\t1\t169.00\n2026-08-21 11:25\tARR\tShipment Arrived\tIST(Istanbul)\tTK6591\t1\t169.00\n2026-08-21 09:05\tBKD\tShipment Booked\tIST(Istanbul)\tTK0903\t1\t169.00\n2026-08-21 09:05\tBKD\tShipment Booked\tPVG(Shanghai)\tTK6591\t1\t169.00\n2026-08-21 05:33\tDEP\tShipment Departed\tPVG(Shanghai)\tTK6591\t1\t169.00\n2026-08-20 23:06\tRCS\tShipment Accepted\tPVG(Shanghai)\t--\t1\t169.00", "航班信息2": [{"file_token": "IxFQb4wcvo3ZL2xqP7wcrstOn9b", "name": "t17_doc_235-96793395.docx", "size": 36077, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=IxFQb4wcvo3ZL2xqP7wcrstOn9b", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/IxFQb4wcvo3ZL2xqP7wcrstOn9b/download"}], "航班号": "TK6591 / TK0903", "航线": "PVG-IST-PTY", "飞常准": "（航班已飞 ATD=2026-08-21 05:33，无需飞常准查询）"}, "id": "recvsT9MwRjfWJ", "record_id": "recvsT9MwRjfWJ"}, {"fields": {"AI分析结果": "运单号：235-96777881\n航线：CGO-IST-CDG\n是否转飞：是\n是否分批：是\n头程ETD：2026-08-19 04:15\n头程ETA：2026-08-21 12:25\n头程ATD：2026-08-19 09:06\n头程ATA：2026-08-22 13:28\n二程ETD：2026-08-24 07:15\n二程ETA：2026-08-24 10:00\n二程ATD：无\n二程ATA：无\n航班状态：in transit\n航班号：TK6211 / TK6317 / TK1821\ndeadline校验结果：无deadline信息，不做比对\n冲突备注：判定分批：同一运单11件647.00kg分不同头程航班运输，TK6211承运7件412.00kg，TK6317承运4件235.00kg；批次明细：TK6211 CGO-IST 7件412.00kg，实际起飞DEP 2026-08-19 09:06，实际到港/入库RCF 2026-08-19 20:42；TK6317 CGO-IST 4件235.00kg，实际起飞无，实际到港ARR 2026-08-22 05:35，RCF入库 2026-08-22 13:28；二程TK1821 IST-CDG 11件647.00kg仅BKD，未见实际起飞/到港。Word未提供ETD/ETA，按截图补充；截图仅显示TK6317 ATA 2026-08-22 05:35，Word存在后续RCF 2026-08-22 13:28，头程ATA按Word取最晚RCF。", "ATA": 1787376480000, "ATD": 1787101560000, "ETA": 1787286300000, "ETD": 1787084100000, "deadline校验结果": "无deadline信息，不做比对", "主单号": "235-96777881", "二程ATA": null, "二程ATD": null, "二程ETA": 1787536800000, "二程ETD": 1787526900000, "代理deadline": null, "冲突备注": "判定分批：同一运单11件647.00kg分不同头程航班运输，TK6211承运7件412.00kg，TK6317承运4件235.00kg；批次明细：TK6211 CGO-IST 7件412.00kg，实际起飞DEP 2026-08-19 09:06，实际到港/入库RCF 2026-08-19 20:42；TK6317 CGO-IST 4件235.00kg，实际起飞无，实际到港ARR 2026-08-22 05:35，RCF入库 2026-08-22 13:28；二程TK1821 IST-CDG 11件647.00kg仅BKD，未见实际起飞/到港。Word未提供ETD/ETA，按截图补充；截图仅显示TK6317 ATA 2026-08-22 05:35，Word存在后续RCF 2026-08-22 13:28，头程ATA按Word取最晚RCF。", "启运港": "CGO (Zhengzhou)", "客户": "中誉", "截图": [{"file_token": "JX1jbV7HNoC6vQxRFc9c7seunCf", "name": "t17_expand_235-96777881.png", "size": 92706, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=JX1jbV7HNoC6vQxRFc9c7seunCf", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/JX1jbV7HNoC6vQxRFc9c7seunCf/download"}], "是否分批": "是", "是否转运": "是", "查询完成时间": "2026-08-24 08:30:54", "查询状态": "Not Found", "目的港": "CDG (Paris)", "航班信息": "235-96777881\nNot Found\nAirline\nTurkish Airlines\nNetwork error, please try again later.\nRefresh", "航班信息2": [{"file_token": "AwV2bmMkMoLHqdxGYyqcONSJnYe", "name": "t17_doc_235-96777881.docx", "size": 35437, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=AwV2bmMkMoLHqdxGYyqcONSJnYe", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/AwV2bmMkMoLHqdxGYyqcONSJnYe/download"}], "航班号": "TK6211 / TK6317 / TK1821", "航线": "CGO-IST-CDG", "飞常准": "（无航班号，跳过飞常准查询）"}, "id": "recvsTgTLxXkDt", "record_id": "recvsTgTLxXkDt"}, {"fields": {"AI分析结果": "运单号：235-99120836\n航线：PVG-IST-MAD\n是否转飞：是\n是否分批：否\n头程ETD：2026-08-23 05:15\n头程ETA：2026-08-23 11:55\n头程ATD：2026-08-23 06:03\n头程ATA：无\n二程ETD：2026-08-24 13:30\n二程ETA：2026-08-24 17:00\n二程ATD：无\n二程ATA：无\n航班状态：in transit\n航班号：TK6595/TK1859\ndeadline校验结果：无deadline信息，不做比对\n冲突备注：无", "ATA": null, "ATD": 1787436180000, "ETA": 1787457300000, "ETD": 1787433300000, "deadline校验结果": "无deadline信息，不做比对", "主单号": "235-99120836", "二程ATA": null, "二程ATD": null, "二程ETA": 1787562000000, "二程ETD": 1787549400000, "代理deadline": null, "冲突备注": "无", "启运港": "PVG (Shanghai)", "客户": "海泰科", "截图": [{"file_token": "CngnbNeOFo2D3WxymPocK7Sjn0m", "name": "t17_expand_235-99120836.png", "size": 93570, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=CngnbNeOFo2D3WxymPocK7Sjn0m", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/CngnbNeOFo2D3WxymPocK7Sjn0m/download"}], "是否分批": "否", "是否转运": "是", "查询完成时间": "2026-08-24 08:30:54", "查询状态": "in transit", "目的港": "MAD (Madrid)", "航班信息": "235-99120836\nIn Transit\nPVG\n(Shanghai)\nMAD\n(Madrid)\nTotal piece\n/\nWeight:\n3 pcs\n/\n142.0 kg\nFlight no.\nTK1859\nDeparture time\nETD\n2026-08-24 13:30\nArrival time\nETA\n2026-08-24 17:00\nPiece\n3 pcs\nLatest event: 2026-08-23 06:03  DEP | Shipment Departed | PVG(Shanghai) | TK6595 | 3 pcs | 142.00 kg\nFlight details\n-\nAirline: Turkish Airlines\nPVG > IST > MAD\nCopy details\nCopy link\nTranslate:\nEnglish\nOrigin\tDestination\tFlight no.\tDeparture time\tArrival time\tPiece\tWeight\tStatus\nIST(Istanbul)\tMAD(Madrid)\tTK1859\n2026-08-24 13:30(ETD)\n--\n2026-08-24 17:00(ETA)\n--\n3\t142.0\t--\nPVG(Shanghai)\tIST(Istanbul)\tTK6595\n2026-08-23 05:15(ETD)\n2026-08-23 06:03(ATD)\n2026-08-23 11:55(ETA)\n--\n3\t142.0\t--\nHistory\nEvent time(Local)\tStatus\tDescription\tStation\tFlight no.\tPiece\tWeight(kg)\n2026-08-23 06:03\tDEP\tShipment Departed\tPVG(Shanghai)\tTK6595\t3\t142.00\n2026-08-22 22:42\tRCS\tShipment Accepted\tPVG(Shanghai)\t--\t3\t142.00\n2026-08-22 10:00\tBKD\tShipment Booked\tIST(Istanbul)\tTK1859\t3\t142.00\n2026-08-22 10:00\tBKD\tShipment Booked\tPVG(Shanghai)\tTK6595\t3\t142.00", "航班信息2": [{"file_token": "WelObAwEeo20YaxGY7NcBSi3nmc", "name": "t17_doc_235-99120836.docx", "size": 35921, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=WelObAwEeo20YaxGY7NcBSi3nmc", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/WelObAwEeo20YaxGY7NcBSi3nmc/download"}], "航班号": "TK6595/TK1859", "航线": "PVG-IST-MAD", "飞常准": "（航班已飞 ATD=2026-08-23 06:03，无需飞常准查询）"}, "id": "recvsYUeJay624", "record_id": "recvsYUeJay624"}, {"fields": {"AI分析结果": "运单号：880-50966554\n航线：PEK-BEG\n是否转飞：否\n是否分批：否\n头程ETD：2026-08-22 03:31\n头程ETA：2026-08-22 07:32\n头程ATD：2026-08-22 06:17\n头程ATA：2026-08-22 13:45\n二程ETD：无\n二程ETA：无\n二程ATD：无\n二程ATA：无\n航班状态：arrived\n航班号：HU7969\ndeadline校验结果：无deadline信息，不做比对\n冲突备注：Word存在两个非Planned DEP事件：2026-08-22 06:17 与 2026-08-22 03:31；截图标注2026-08-22 03:31为ETD、2026-08-22 06:17为ATD、2026-08-22 07:32为ETA。ATA按Word目的港RCF取2026-08-22 13:45。", "ATA": 1787377500000, "ATD": 1787350620000, "ETA": 1787355120000, "ETD": 1787340660000, "deadline校验结果": "无deadline信息，不做比对", "主单号": "880-50966554", "二程ATA": null, "二程ATD": null, "二程ETA": null, "二程ETD": null, "代理deadline": null, "冲突备注": "Word存在两个非Planned DEP事件：2026-08-22 06:17 与 2026-08-22 03:31；截图标注2026-08-22 03:31为ETD、2026-08-22 06:17为ATD、2026-08-22 07:32为ETA。ATA按Word目的港RCF取2026-08-22 13:45。", "启运港": "PEK (Beijing)", "客户": "豪迈", "截图": [{"file_token": "KQkIb7YoGoDRryxfwCDcR6WYnCe", "name": "t17_expand_880-50966554.png", "size": 90220, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=KQkIb7YoGoDRryxfwCDcR6WYnCe", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/KQkIb7YoGoDRryxfwCDcR6WYnCe/download"}], "是否分批": "否", "是否转运": "否", "查询完成时间": "2026-08-23 08:58:00", "查询状态": "arrived", "目的港": "BEG (Belgrade)", "航班信息": "880-50966554\nPick Up Notified\nPEK\n(Beijing)\nBEG\n(Belgrade)\nTotal piece\n/\nWeight:\n2 pcs\n/\n1172.0 KG\nFlight no.\nHU7969\nDeparture time\nATD\n2026-08-22 06:17\nArrival time\nETA\n2026-08-22 07:32\nPiece\n2 pcs\nLatest event: 2026-08-22 13:53  NFD | 已于8月22日15:52通知提货 | BEG(Belgrade) | 2 pcs | 1172.00 KG\nFlight details\n-\nAirline: Hainan Airlines\nPEK > BEG\nCopy details\nCopy link\nTranslate:\nEnglish\nOrigin\tDestination\tFlight no.\tDeparture time\tArrival time\tPiece\tWeight\tStatus\nPEK(Beijing)\tBEG(Belgrade)\tHU7969\n2026-08-22 03:31(ETD)\n2026-08-22 06:17(ATD)\n2026-08-22 07:32(ETA)\n--\n2\t1172.0\t--\nHistory\nEvent time(Local)\tStatus\tDescription\tStation\tFlight no.\tPiece\tWeight(KG)\n2026-08-22 13:53\tNFD\t已于8月22日15:52通知提货\tBEG(Belgrade)\t--\t2\t1172.00\n2026-08-22 13:45\tRCF\t已于8月22日15:41收到HU7969航班货物\tBEG(Belgrade)\tHU7969\t2\t1172.00\n2026-08-22 06:17\tDEP\t离港航班：HU7969/8月22日/PEK-BEG\tPEK(Beijing)\tHU7969\t2\t1172.00\n2026-08-22 03:31\tDEP\tHU7969,北京首都-贝尔格莱德,实际起飞：2026-08-22 03:31:00,实际到达：2026-08-22 07:32:00\tPEK(Beijing)\tHU7969\t2\t1172.00\n2026-08-20 16:10\tRCS\t--\tPEK(Beijing)\t--\t2\t1172.00", "航班信息2": [{"file_token": "RZYHbL1w3oW4JjxkcyYcZpuanEc", "name": "t17_doc_880-50966554.docx", "size": 36074, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=RZYHbL1w3oW4JjxkcyYcZpuanEc", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/RZYHbL1w3oW4JjxkcyYcZpuanEc/download"}], "航班号": "HU7969", "航线": "PEK-BEG", "飞常准": "（航班已飞 ATD=2026-08-22 06:17，无需飞常准查询）"}, "id": "recvsYUmxrIVcZ", "record_id": "recvsYUmxrIVcZ"}, {"fields": {"AI分析结果": "运单号：999-94702112\n航线：PEK-BUD\n是否转飞：否\n是否分批：是\n头程ETD：无\n头程ETA：无\n头程ATD：2026-08-22 03:34\n头程ATA：无\n二程ETD：无\n二程ETA：无\n二程ATD：无\n二程ATA：无\n航班状态：in transit\n航班号：CA719\ndeadline校验结果：无deadline信息，不做比对\n冲突备注：判定分批：Word显示RCS总票4件2625.00K；第一批2件1444.00K，CA719，PEK实际DEP 2026-08-22 03:34，未见目的港ARR/RCF；第二批2件1181.00K，CA719，2026-08-22 14:06 MAN预配，未见实际DEP/ARR/RCF。截图与Word差异：截图航班明细显示4件/2641.0K且状态BKD，Word以RCS总票4件2625.00K、实际DEP 2件1444.00K为准；截图历史缺少Word中的多条MAN/RCS记录。", "ATA": null, "ATD": 1787430120000, "ETA": null, "ETD": null, "deadline校验结果": "无deadline信息，不做比对", "主单号": "999-94702112", "二程ATA": null, "二程ATD": null, "二程ETA": null, "二程ETD": null, "代理deadline": null, "冲突备注": "判定分批：Word显示RCS总票4件2625.00K；第一批2件1444.00K，CA719，PEK实际DEP 2026-08-22 03:34，未见目的港ARR/RCF；第二批2件1181.00K，CA719，2026-08-22 14:06 MAN预配，未见实际DEP/ARR/RCF。截图与Word差异：截图航班明细显示4件/2641.0K且状态BKD，Word以RCS总票4件2625.00K、实际DEP 2件1444.00K为准；截图历史缺少Word中的多条MAN/RCS记录。", "启运港": "PEK (Beijing)", "客户": "豪迈", "截图": [{"file_token": "KJWvbze4DoT54exsJ4xcqqzKnPf", "name": "t17_expand_999-94702112.png", "size": 88728, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=KJWvbze4DoT54exsJ4xcqqzKnPf", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/KJWvbze4DoT54exsJ4xcqqzKnPf/download"}], "是否分批": "是", "是否转运": "否", "查询完成时间": "2026-08-23 08:58:00", "查询状态": "Pick Up Notified", "目的港": "BUD (Budapest)", "航班信息": "999-94702112\nPick Up Notified\nPEK\n(Beijing)\nBUD\n(Budapest)\nTotal piece\n/\nWeight:\n4 pcs\n/\n2625.0 K\nFlight no.\nCA719\nDeparture time\nATD\n2026-08-23 04:22\nArrival time\nETA\n--\nPiece\n4 pcs\nLatest event: 2026-08-23 04:22  DEP | 航班离港 北京首都国际机场PEK | PEK(Beijing) | CA719 | 2 pcs | 1181.00 K\nFlight details\n-\nAirline: Air China Cargo\nPEK > BUD\nCopy details\nCopy link\nTranslate:\nEnglish\nOrigin\tDestination\tFlight no.\tDeparture time\tArrival time\tPiece\tWeight\tStatus\nPEK(Beijing)\tBUD(Budapest)\tCA719\n--\n2026-08-23 04:22(ATD)\n--\n--\n4\t4069.0\tBKD\nHistory\nEvent time(Local)\tStatus\tDescription\tStation\tFlight no.\tPiece\tWeight(K)\n2026-08-23 04:22\tDEP\t航班离港 北京首都国际机场PEK\tPEK(Beijing)\tCA719\t2\t1181.00\n2026-08-22 23:35\tMAN\t货物预配 北京首都国际机场PEK\tPEK(Beijing)\tCA719\t2\t1181.00\n2026-08-22 23:18\tMAN\t货物预配 北京首都国际机场PEK\tPEK(Beijing)\tCA719\t2\t1181.00\n2026-08-22 23:17\tMAN\t货物预配 北京首都国际机场PEK\tPEK(Beijing)\tCA719\t2\t1181.00\n2026-08-22 17:16\tNFD\t到货通知 布达佩斯BUD\tBUD(Budapest)\t--\t2\t1444.00\n2026-08-22 15:58\tRCF\t货物接收 布达佩斯BUD\tBUD(Budapest)\tCA719\t2\t1444.00\n2026-08-22 14:06\tMAN\t货物预配 北京首都国际机场PEK\tPEK(Beijing)\tCA719\t2\t1181.00\n2026-08-22 03:34\tDEP\t航班离港 北京首都国际机场PEK\tPEK(Beijing)\tCA719\t2\t1444.00\n2026-08-22 02:24\tMAN\t货物预配 北京首都国际机场PEK\tPEK(Beijing)\tCA719\t2\t1444.00\n2026-08-22 00:58\tMAN\t货物预配 北京首都国际机场PEK\tPEK(Beijing)\tCA719\t2\t1444.00\n2026-08-21 23:59\tMAN\t货物预配 北京首都国际机场PEK\tPEK(Beijing)\tCA719\t2\t1444.00\n2026-08-21 20:54\tRCS\t货物收运 北京首都国际机场PEK\tPEK(Beijing)\t--\t4\t2625.00\n2026-08-21 14:27\tMAN\t货物预配 北京首都国际机场PEK\tPEK(Beijing)\tCA719\t4\t2625.00", "航班信息2": [{"file_token": "SWXkbcAKloZCWZxHVrqcbPnZngc", "name": "t17_doc_999-94702112.docx", "size": 36187, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=SWXkbcAKloZCWZxHVrqcbPnZngc", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/SWXkbcAKloZCWZxHVrqcbPnZngc/download"}], "航班号": "CA719", "航线": "PEK-BUD", "飞常准": "（航班已飞 ATD=2026-08-23 04:22，无需飞常准查询）"}, "id": "recvsYUnFr2gh1", "record_id": "recvsYUnFr2gh1"}, {"fields": {"AI分析结果": "运单号：999-94835311\n航线：PEK-BUD\n是否转飞：否\n是否分批：否\n头程ETD：无\n头程ETA：无\n头程ATD：2026-08-22 03:34\n头程ATA：2026-08-22 15:58\n二程ETD：无\n二程ETA：无\n二程ATD：无\n二程ATA：无\n航班状态：arrived\n航班号：CA719\ndeadline校验结果：无deadline信息，不做比对\n冲突备注：截图航班明细到达时间显示为--，Word中存在RCF 2026-08-22 15:58，按Word提取头程ATA；无其他冲突。", "ATA": 1787385480000, "ATD": 1787340840000, "ETA": null, "ETD": null, "deadline校验结果": "无deadline信息，不做比对", "主单号": "999-94835311", "二程ATA": null, "二程ATD": null, "二程ETA": null, "二程ETD": null, "代理deadline": null, "冲突备注": "截图航班明细到达时间显示为--，Word中存在RCF 2026-08-22 15:58，按Word提取头程ATA；无其他冲突。", "启运港": "PEK (Beijing)", "客户": "豪迈", "截图": [{"file_token": "KEEEbNJlJozwWMx60zUcPEqrnve", "name": "t17_expand_999-94835311.png", "size": 83437, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=KEEEbNJlJozwWMx60zUcPEqrnve", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/KEEEbNJlJozwWMx60zUcPEqrnve/download"}], "是否分批": "否", "是否转运": "否", "查询完成时间": "2026-08-23 10:03:15", "查询状态": "arrived", "目的港": "BUD (Budapest)", "航班信息": "999-94835311\nPick Up Notified\nPEK\n(Beijing)\nBUD\n(Budapest)\nTotal piece\n/\nWeight:\n1 pcs\n/\n95.0 K\nFlight no.\nCA719\nDeparture time\nATD\n2026-08-22 03:34\nArrival time\nETA\n--\nPiece\n1 pcs\nLatest event: 2026-08-22 17:16  NFD | 到货通知 布达佩斯BUD | BUD(Budapest) | 1 pcs | 95.00 K\nFlight details\n-\nAirline: Air China Cargo\nPEK > BUD\nCopy details\nCopy link\nTranslate:\nEnglish\nOrigin\tDestination\tFlight no.\tDeparture time\tArrival time\tPiece\tWeight\tStatus\nPEK(Beijing)\tBUD(Budapest)\tCA719\n--\n2026-08-22 03:34(ATD)\n--\n--\n1\t95.0\tBKD\nHistory\nEvent time(Local)\tStatus\tDescription\tStation\tFlight no.\tPiece\tWeight(K)\n2026-08-22 17:16\tNFD\t到货通知 布达佩斯BUD\tBUD(Budapest)\t--\t1\t95.00\n2026-08-22 15:58\tRCF\t货物接收 布达佩斯BUD\tBUD(Budapest)\tCA719\t1\t95.00\n2026-08-22 03:34\tDEP\t航班离港 北京首都国际机场PEK\tPEK(Beijing)\tCA719\t1\t95.00\n2026-08-22 02:24\tMAN\t货物预配 北京首都国际机场PEK\tPEK(Beijing)\tCA719\t1\t95.00\n2026-08-22 00:58\tMAN\t货物预配 北京首都国际机场PEK\tPEK(Beijing)\tCA719\t1\t95.00\n2026-08-21 23:59\tMAN\t货物预配 北京首都国际机场PEK\tPEK(Beijing)\tCA719\t1\t95.00\n2026-08-21 20:53\tRCS\t货物收运 北京首都国际机场PEK\tPEK(Beijing)\t--\t1\t95.00\n2026-08-20 17:46\tMAN\t货物预配 北京首都国际机场PEK\tPEK(Beijing)\tCA719\t1\t95.00", "航班信息2": [{"file_token": "PNDUbtL43oAZMixQps6c1b8lnaf", "name": "t17_doc_999-94835311.docx", "size": 36074, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=PNDUbtL43oAZMixQps6c1b8lnaf", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/PNDUbtL43oAZMixQps6c1b8lnaf/download"}], "航班号": "CA719", "航线": "PEK-BUD", "飞常准": "（航班已飞 ATD=2026-08-22 03:34，无需飞常准查询）"}, "id": "recvsYUybQtf6H", "record_id": "recvsYUybQtf6H"}, {"fields": {"AI分析结果": "运单号：172-06366430\n航线：CGO-LUX\n是否转飞：否\n是否分批：否\n头程ETD：无\n头程ETA：无\n头程ATD：2026-08-22 01:49\n头程ATA：2026-08-22 09:26\n二程ETD：无\n二程ETA：无\n二程ATD：无\n二程ATA：无\n航班状态：arrived\n航班号：CV9735\ndeadline校验结果：无deadline信息，不做比对\n冲突备注：无", "ATA": 1787361960000, "ATD": 1787334540000, "ETA": 1787361600000, "ETD": 1787334540000, "deadline校验结果": "无deadline信息，不做比对", "主单号": "172-06366430", "二程ATA": null, "二程ATD": null, "二程ETA": null, "二程ETD": null, "代理deadline": null, "冲突备注": "无", "启运港": "CGO (Zhengzhou)", "客户": "豪迈", "截图": [{"file_token": "EO0Ab9eONoQTgrxon3ica9ynnkL", "name": "t17_expand_172-06366430.png", "size": 93709, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=EO0Ab9eONoQTgrxon3ica9ynnkL", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/EO0Ab9eONoQTgrxon3ica9ynnkL/download"}], "是否分批": "否", "是否转运": "否", "查询完成时间": "2026-08-22 16:23:24", "查询状态": "arrived", "目的港": "LUX (Luxembourg)", "航班信息": "172-06366430\nArrived\nCGO\n(Zhengzhou)\nLUX\n(Luxembourg)\nTotal piece\n/\nWeight:\n1 pcs\n/\n104.0 kg\nFlight no.\nCV9735\nDeparture time\nATD\n2026-08-22 01:49\nArrival time\nATA\n2026-08-22 09:26\nPiece\n1 pcs\nLatest event: 2026-08-22 21:20  AWD | Planned delivery of documents | LUX(Luxembourg) | CV9735 | 1 pcs | 104.00 kg\nFlight details\n-\nAirline: Cargolux\nCGO > LUX\nCopy details\nCopy link\nTranslate:\nEnglish\nOrigin\tDestination\tFlight no.\tDeparture time\tArrival time\tPiece\tWeight\tStatus\nCGO(Zhengzhou)\tLUX(Luxembourg)\tCV9735\n--\n2026-08-22 01:49(ATD)\n--\n2026-08-22 09:26(ATA)\n1\t104.0\tARR\nHistory\nEvent time(Local)\tStatus\tDescription\tStation\tFlight no.\tPiece\tWeight(kg)\n2026-08-22 21:20\tAWD\t[Planned]Planned delivery of documents\tLUX(Luxembourg)\tCV9735\t1\t104.00\n2026-08-22 21:20\tRCF\t[Planned]Planned for reception\tLUX(Luxembourg)\tCV9735\t1\t104.00\n2026-08-22 10:45\tNFD\t[Planned]Planned pick up\tLUX(Luxembourg)\tCV9735\t1\t104.00\n2026-08-22 09:26\tARR\tArrived\tLUX(Luxembourg)\tCV9735\t1\t104.00\n2026-08-22 01:49\tDEP\tDeparted\tCGO(Zhengzhou)\tCV9735\t1\t104.00\n2026-08-21 18:41\tRCS\tReady for carriage\tCGO(Zhengzhou)\t--\t1\t104.00\n2026-08-21 18:41\tFOH\ton hand\tCGO(Zhengzhou)\t--\t1\t104.00\n2026-08-21 09:47\tBKD\tFWB Data Capture\tCGO(Zhengzhou)\t--\t1\t104.00", "航班信息2": [{"file_token": "ZQMWbtr6qoauilxza00c5h3ynJh", "name": "t17_doc_172-06366430.docx", "size": 36006, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=ZQMWbtr6qoauilxza00c5h3ynJh", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/ZQMWbtr6qoauilxza00c5h3ynJh/download"}], "航班号": "CV9735", "航线": "CGO-LUX", "飞常准": "（航班已飞 ATD=2026-08-22 01:49，无需飞常准查询）"}, "id": "recvsYUzRchXWc", "record_id": "recvsYUzRchXWc"}, {"fields": {"AI分析结果": "运单号：020-43609510\n航线：PEK-LJU\n是否转飞：是\n是否分批：否\n头程ETD：2026-08-23 14:00\n头程ETA：2026-08-23 19:30\n头程ATD：2026-08-23 14:02\n头程ATA：2026-08-23 19:44\n二程ETD：2026-08-24 04:35\n二程ETA：2026-08-24 11:35\n二程ATD：无\n二程ATA：无\n航班状态：in transit\n航班号：LH723 / LH7247B / LH7446S / LH7446 / LH7247\ndeadline校验结果：存在延迟｜提醒：预计起飞晚于代理截止时间\n冲突备注：Word未提供头程计划ETD/ETA，取截图头程ETD 2026-08-23 14:00、ETA 2026-08-23 19:30；Word二程MUC-FRA计划事件为LH7247 ETD 2026-08-24 04:35、ETA 2026-08-24 11:35，截图为LH7247B ETD 2026-08-24 05:35、到达2026-08-24 11:35，二程ETD与航班号后缀存在差异，按Word取值；三程/后续FRA-LJU在Word为LH7446S/LH7446，计划DEP 2026-08-26 06:05、计划ARR 2026-08-27 06:00、计划RCF 2026-08-27 10:24，均为Planned，未作为实际ATD/ATA；全程件重一致1件/96.00，无分批。", "ATA": 1787485440000, "ATD": 1787464920000, "ETA": 1787484600000, "ETD": 1787464800000, "deadline校验结果": "存在延迟｜提醒：预计起飞晚于代理截止时间", "主单号": "020-43609510", "二程ATA": null, "二程ATD": null, "二程ETA": 1787542500000, "二程ETD": 1787517300000, "代理deadline": 1786896000000, "冲突备注": "Word未提供头程计划ETD/ETA，取截图头程ETD 2026-08-23 14:00、ETA 2026-08-23 19:30；Word二程MUC-FRA计划事件为LH7247 ETD 2026-08-24 04:35、ETA 2026-08-24 11:35，截图为LH7247B ETD 2026-08-24 05:35、到达2026-08-24 11:35，二程ETD与航班号后缀存在差异，按Word取值；三程/后续FRA-LJU在Word为LH7446S/LH7446，计划DEP 2026-08-26 06:05、计划ARR 2026-08-27 06:00、计划RCF 2026-08-27 10:24，均为Planned，未作为实际ATD/ATA；全程件重一致1件/96.00，无分批。", "启运港": "PEK (Beijing)", "客户": "豪迈", "截图": [{"file_token": "Clbpbqkoro7geExbElOcqm8KnIe", "name": "t17_expand_020-43609510.png", "size": 92604, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=Clbpbqkoro7geExbElOcqm8KnIe", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/Clbpbqkoro7geExbElOcqm8KnIe/download"}], "是否分批": "否", "是否转运": "是", "查询完成时间": "2026-08-24 08:30:54", "查询状态": "in transit", "目的港": "LJU (Ljubljana)", "航班信息": "020-43609510\nIn Transit\nPEK\n(Beijing)\nLJU\n(Ljubljana)\nTotal piece\n/\nWeight:\n1 pcs\n/\n96.0\nFlight no.\nLH7247B\nDeparture time\nETD\n2026-08-24 05:35\nArrival time\n--\nPiece\n1 pcs\nLatest event: 2026-08-27 16:00  DLV | LJU(Ljubljana) | 1 pcs | 96.00\nFlight details\n-\nAirline: Lufthansa Cargo\nCopy details\nCopy link\nTranslate:\nEnglish\nOrigin\tDestination\tFlight no.\tDeparture time\tArrival time\tPiece\tWeight\tStatus\nFRA(Frankfurt)\tLJU(Ljubljana)\tLH7446S\n2026-08-26 06:05(STD)\n--\n2026-08-27 06:00(STA)\n--\n1\t96.0\t--\nMUC(Munich)\tFRA(Frankfurt)\tLH7247B\n2026-08-24 05:35(ETD)\n--\n2026-08-24 11:35(STA)\n--\n1\t96.0\t--\nPEK(Beijing)\tMUC(Munich)\tLH723\n2026-08-23 14:00(ETD)\n2026-08-23 14:02(ATD)\n2026-08-23 19:30(ETA)\n2026-08-23 19:44(ATA)\n1\t96.0\t--\nHistory\nEvent time(Local)\tStatus\tDescription\tStation\tFlight no.\tPiece\tWeight\n2026-08-27 16:00\tDLV\t[Planned]--\tLJU(Ljubljana)\t--\t1\t96.00\n2026-08-27 16:00\tNFD\t[Planned]--\tLJU(Ljubljana)\t--\t1\t96.00\n2026-08-27 10:24\tRCF\t[Planned]--\tLJU(Ljubljana)\tLH7446\t1\t96.00\n2026-08-27 06:00\tARR\t[Planned]--\tLJU(Ljubljana)\tLH7446\t1\t96.00\n2026-08-26 06:05\tDEP\t[Planned]--\tFRA(Frankfurt)\tLH7446\t1\t96.00\n2026-08-26 05:05\tMAN\t[Planned]--\tFRA(Frankfurt)\tLH7446\t1\t96.00\n2026-08-24 15:50\tRCF\t[Planned]--\tFRA(Frankfurt)\tLH7247\t1\t96.00\n2026-08-24 11:35\tARR\t[Planned]--\tFRA(Frankfurt)\tLH7247\t1\t96.00\n2026-08-24 04:35\tDEP\t[Planned]--\tMUC(Munich)\tLH7247\t1\t96.00\n2026-08-24 00:33\tMAN\t--\tMUC(Munich)\tLH7247\t1\t96.00\n2026-08-23 21:08\tRCF\t--\tMUC(Munich)\tLH723\t1\t96.00\n2026-08-23 19:44\tARR\t--\tMUC(Munich)\tLH723\t1\t96.00\n2026-08-23 14:23\tMAN\t--\tPEK(Beijing)\tLH723\t1\t96.00\n2026-08-23 14:02\tDEP\t--\tPEK(Beijing)\tLH723\t1\t96.00\n2026-08-22 18:12\tBKD\t--\tPEK(Beijing)\t--\t1\t96.00\n2026-08-22 17:58\tRCS\t--\tPEK(Beijing)\t--\t1\t96.00", "航班信息2": [{"file_token": "TQHCbTDuXoMZkKxrUercoV4UnSh", "name": "t17_doc_020-43609510.docx", "size": 36208, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=TQHCbTDuXoMZkKxrUercoV4UnSh", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/TQHCbTDuXoMZkKxrUercoV4UnSh/download"}], "航班号": "LH723 / LH7247B / LH7446S / LH7446 / LH7247", "航线": "PEK-LJU", "飞常准": "（航班已飞 ATD=2026-08-23 14:02，无需飞常准查询）"}, "id": "recvsYUStPsFK9", "record_id": "recvsYUStPsFK9"}, {"fields": {"AI分析结果": "运单号：936-02524351\n航线：ICN-CVG-EZE\n是否转飞：是\n是否分批：否\n头程ETD：2026-08-22 22:20\n头程ETA：无\n头程ATD：2026-08-22 22:20\n头程ATA：2026-08-22 22:14\n二程ETD：无\n二程ETA：无\n二程ATD：无\n二程ATA：无\n航班状态：arrived\n航班号：SQ7446\ndeadline校验结果：无延迟\n冲突备注：Word路线/航班明细显示ICN→EZE，但History显示SQ7446至CVG且ARR站点为CVG，按存在中转机场判定转飞；未见CVG→EZE二程航班及最终EZE到达记录，二程信息填无。截图Flight details出发/到达时间为--且History缺少Word中的DEP/RCS，以Word为准。CVG ARR 2026-08-22 22:14与ICN DEP 2026-08-22 22:20均为原文当地时间，未做时区转换。", "ATA": 1787408040000, "ATD": 1787408400000, "ETA": null, "ETD": 1787408400000, "deadline校验结果": "无延迟", "主单号": "936-02524351", "二程ATA": null, "二程ATD": null, "二程ETA": null, "二程ETD": null, "代理deadline": 1787500800000, "冲突备注": "Word路线/航班明细显示ICN→EZE，但History显示SQ7446至CVG且ARR站点为CVG，按存在中转机场判定转飞；未见CVG→EZE二程航班及最终EZE到达记录，二程信息填无。截图Flight details出发/到达时间为--且History缺少Word中的DEP/RCS，以Word为准。CVG ARR 2026-08-22 22:14与ICN DEP 2026-08-22 22:20均为原文当地时间，未做时区转换。", "启运港": "ICN (Seoul)", "客户": "海信", "截图": [{"file_token": "UyQmbM4AqooLnnxDRzOceMWsn4b", "name": "t17_expand_936-02524351.png", "size": 72976, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=UyQmbM4AqooLnnxDRzOceMWsn4b", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/UyQmbM4AqooLnnxDRzOceMWsn4b/download"}], "是否分批": "否", "是否转运": "是", "查询完成时间": "2026-08-23 16:23:59", "查询状态": "arrived", "目的港": "EZE (Buenos Aires)", "航班信息": "936-02524351\nArrived\nICN\n(Seoul)\nEZE\n(Buenos Aires)\nTotal piece\n/\nWeight:\n1 pcs\n/\n328.0 kg\nFlight no.\nSQ7446\nDeparture time\n--\nArrival time\n--\nPiece\n1 pcs\nLatest event: 2026-08-22 22:14  ARR | Arrived Facility | CVG(Hebron) | 1 pcs\nFlight details\n-\nAirline: DHL Air\nICN > EZE\nCopy details\nCopy link\nTranslate:\nEnglish\nOrigin\tDestination\tFlight no.\tDeparture time\tArrival time\tPiece\tWeight\tStatus\nICN(Seoul)\tEZE(Buenos Aires)\tSQ7446\n--\n--\n--\n--\n1\t--\t--\nHistory\nEvent time(Local)\tStatus\tDescription\tStation\tFlight no.\tPiece\tWeight(kg)\n2026-08-22 22:14\tARR\tArrived Facility\tCVG(Hebron)\t--\t1\t--\n2026-08-22 22:20\tTRM\tManifested onto movement SQ7446 to CVG\tICN(Seoul)\tSQ7446\t1\t--\n2026-08-22 22:20\tDEP\tDepart Facility\tICN(Seoul)\t--\t1\t--\n2026-08-22 14:21\tRCS\tFacility Check In\tICN(Seoul)\t--\t1\t--", "航班信息2": [{"file_token": "APBSbLVX8oPHs9xL5fOcG8D3ncd", "name": "t17_doc_936-02524351.docx", "size": 35874, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=APBSbLVX8oPHs9xL5fOcG8D3ncd", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/APBSbLVX8oPHs9xL5fOcG8D3ncd/download"}], "航班号": "SQ7446", "航线": "ICN-CVG-EZE", "飞常准": "（航班已飞 ATD=2026-08-22 22:20，无需飞常准查询）"}, "id": "recvt1FkHumKiw", "record_id": "recvt1FkHumKiw"}, {"fields": {"AI分析结果": "运单号：172-06382235\n航线：CGO-LUX\n是否转飞：否\n是否分批：否\n头程ETD：2026-08-24 04:54\n头程ETA：2026-08-24 16:06\n头程ATD：2026-08-24 04:54\n头程ATA：无\n二程ETD：无\n二程ETA：无\n二程ATD：无\n二程ATA：无\n航班状态：in transit\n航班号：CV9737\ndeadline校验结果：存在延迟｜提醒：预计起飞晚于代理截止时间\n冲突备注：Word中ARR/RCF/AWD均为Planned计划事件，未作为ATA提取；截图Arrival time为--，无实际到达时间；Word无明确STD/ETD字段，头程ETD取截图STD 2026-08-24 04:54。", "ATA": null, "ATD": 1787518440000, "ETA": 1787558760000, "ETD": 1787518440000, "deadline校验结果": "存在延迟｜提醒：预计起飞晚于代理截止时间", "主单号": "172-06382235", "二程ATA": null, "二程ATD": null, "二程ETA": null, "二程ETD": null, "代理deadline": 1787068800000, "冲突备注": "Word中ARR/RCF/AWD均为Planned计划事件，未作为ATA提取；截图Arrival time为--，无实际到达时间；Word无明确STD/ETD字段，头程ETD取截图STD 2026-08-24 04:54。", "启运港": "CGO (Zhengzhou)", "客户": "豪迈", "截图": [{"file_token": "MSYNbU1R7o7RawxCVfhc08sinuh", "name": "t17_expand_172-06382235.png", "size": 94342, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=MSYNbU1R7o7RawxCVfhc08sinuh", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/MSYNbU1R7o7RawxCVfhc08sinuh/download"}], "是否分批": "否", "是否转运": "否", "查询完成时间": "2026-08-24 08:30:54", "查询状态": "in transit", "目的港": "LUX (Luxembourg)", "航班信息": "172-06382235\nIn Transit\nCGO\n(Zhengzhou)\nLUX\n(Luxembourg)\nTotal piece\n/\nWeight:\n1 pcs\n/\n16.0 kg\nFlight no.\nCV9737\nDeparture time\nATD\n2026-08-24 04:54\nArrival time\nETA\n--\nPiece\n1 pcs\nLatest event: 2026-08-25 04:06  AWD | Planned delivery of documents | LUX(Luxembourg) | CV9737 | 1 pcs | 16.00 kg\nFlight details\n-\nAirline: Cargolux\nCGO > LUX\nCopy details\nCopy link\nTranslate:\nEnglish\nOrigin\tDestination\tFlight no.\tDeparture time\tArrival time\tPiece\tWeight\tStatus\nCGO(Zhengzhou)\tLUX(Luxembourg)\tCV9737\n2026-08-24 04:54(STD)\n2026-08-24 04:54(ATD)\n2026-08-24 16:06(STA)\n--\n1\t16.0\tBKD\nHistory\nEvent time(Local)\tStatus\tDescription\tStation\tFlight no.\tPiece\tWeight(kg)\n2026-08-25 04:06\tAWD\t[Planned]Planned delivery of documents\tLUX(Luxembourg)\tCV9737\t1\t16.00\n2026-08-25 04:06\tRCF\t[Planned]Planned for reception\tLUX(Luxembourg)\tCV9737\t1\t16.00\n2026-08-24 16:06\tARR\t[Planned]Planned to arrive\tLUX(Luxembourg)\tCV9737\t1\t16.00\n2026-08-24 13:45\tNFD\t[Planned]Planned pick up\tLUX(Luxembourg)\tCV9737\t1\t16.00\n2026-08-24 04:54\tDEP\tDeparted\tCGO(Zhengzhou)\tCV9737\t1\t16.00\n2026-08-23 18:47\tRCS\tReady for carriage\tCGO(Zhengzhou)\t--\t1\t16.00\n2026-08-23 18:47\tFOH\ton hand\tCGO(Zhengzhou)\t--\t1\t16.00\n2026-08-21 11:19\tBKD\tFWB Data Capture\tCGO(Zhengzhou)\t--\t1\t16.00", "航班信息2": [{"file_token": "ResGbhYy9opRBcxYuMMcLo0Inag", "name": "t17_doc_172-06382235.docx", "size": 36012, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=ResGbhYy9opRBcxYuMMcLo0Inag", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/ResGbhYy9opRBcxYuMMcLo0Inag/download"}], "航班号": "CV9737", "航线": "CGO-LUX", "飞常准": "（航班已飞 ATD=2026-08-24 04:54，无需飞常准查询）"}, "id": "recvt1G0QJ7Ohh", "record_id": "recvt1G0QJ7Ohh"}, {"fields": {"AI分析结果": null, "ATA": null, "ATD": null, "ETA": null, "ETD": null, "deadline校验结果": null, "主单号": "480-00378044", "二程ATA": null, "二程ATD": null, "二程ETA": null, "二程ETD": null, "代理deadline": null, "冲突备注": null, "启运港": null, "客户": "海泰科", "截图": null, "是否分批": null, "是否转运": null, "查询完成时间": "2026-08-24 08:30:54", "查询状态": "Not Found", "目的港": null, "航班信息": "480-00378044\nNot Found\nThe AWB number you submitted could not find the tracking information.\nContact us for feedback", "航班信息2": [{"file_token": "M1Tvb8PnKoQg4Zx690WcbhExnbe", "name": "t17_doc_480-00378044.docx", "size": 35447, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=M1Tvb8PnKoQg4Zx690WcbhExnbe", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/M1Tvb8PnKoQg4Zx690WcbhExnbe/download"}], "航班号": null, "航线": null, "飞常准": "（无航班号，跳过飞常准查询）"}, "id": "recvt1JfjN6yLR", "record_id": "recvt1JfjN6yLR"}, {"fields": {"AI分析结果": "运单号：933-35146252\n航线：PVG-NRT-ORD\n是否转飞：是\n是否分批：否\n头程ETD：2026-08-23 15:20\n头程ETA：2026-08-23 19:20\n头程ATD：2026-08-23 15:24\n头程ATA：2026-08-23 19:36\n二程ETD：2026-08-24 22:15\n二程ETA：2026-08-24 22:40\n二程ATD：无\n二程ATA：无\n航班状态：in transit\n航班号：KZ0226 / KZ7134\ndeadline校验结果：无deadline信息，不做比对\n冲突备注：Word未提供明确STD/STA计划时间，头程ETD/ETA及二程ETD/ETA取自截图；Word实际头程DEP/ARR为准，截图一致；二程暂无实际DEP/ARR。", "ATA": 1787484960000, "ATD": 1787469840000, "ETA": 1787484000000, "ETD": 1787469600000, "deadline校验结果": "无deadline信息，不做比对", "主单号": "933-35146252", "二程ATA": null, "二程ATD": null, "二程ETA": 1787582400000, "二程ETD": 1787580900000, "代理deadline": null, "冲突备注": "Word未提供明确STD/STA计划时间，头程ETD/ETA及二程ETD/ETA取自截图；Word实际头程DEP/ARR为准，截图一致；二程暂无实际DEP/ARR。", "启运港": "PVG (Shanghai)", "客户": "豪迈", "截图": [{"file_token": "XTzgbKaYPoe8wExg9M4cEB4SnHe", "name": "t17_expand_933-35146252.png", "size": 100802, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=XTzgbKaYPoe8wExg9M4cEB4SnHe", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/XTzgbKaYPoe8wExg9M4cEB4SnHe/download"}], "是否分批": "否", "是否转运": "是", "查询完成时间": "2026-08-24 08:30:54", "查询状态": "in transit", "目的港": "ORD (Chicago)", "航班信息": "933-35146252\nIn Transit\nPVG\n(Shanghai)\nORD\n(Chicago)\nTotal piece\n/\nWeight:\n6 pcs\n/\n2239.0 kg\nFlight no.\nKZ7134\nDeparture time\nSTD\n2026-08-24 22:15\nArrival time\nSTA\n2026-08-24 22:40\nPiece\n6 pcs\nLatest event: 2026-08-23 19:40  RCF | Transferred from interline Carrier | NRT(Tokyo) | 6 pcs | 2239.00 kg\nFlight details\n-\nAirline: Nippon Cargo Airlines\nPVG > NRT > ORD\nCopy details\nCopy link\nTranslate:\nEnglish\nOrigin\tDestination\tFlight no.\tDeparture time\tArrival time\tPiece\tWeight\tStatus\nNRT(Tokyo)\tORD(Chicago)\tKZ7134\n2026-08-24 22:15(STD)\n--\n2026-08-24 22:40(STA)\n--\n6\t2239.0\t--\nPVG(Shanghai)\tNRT(Tokyo)\tKZ0226\n2026-08-23 15:20(STD)\n2026-08-23 15:24(ATD)\n2026-08-23 19:20(STA)\n2026-08-23 19:36(ATA)\n6\t2239.0\t--\nHistory\nEvent time(Local)\tStatus\tDescription\tStation\tFlight no.\tPiece\tWeight(kg)\n2026-08-23 19:40\tRCF\tTransferred from interline Carrier\tNRT(Tokyo)\t--\t6\t2239.00\n2026-08-23 19:36\tARR\tArrived\tNRT(Tokyo)\tKZ0226\t6\t2239.00\n2026-08-23 15:24\tDEP\tFlight Departed\tPVG(Shanghai)\tKZ0226\t6\t2239.00\n2026-08-23 10:06\tRCS\tGoods Accepted\tPVG(Shanghai)\t--\t3\t1120.00\n2026-08-23 09:46\t\t--\t\tKZ0226\t6\t2239.00\n2026-08-23 09:46\t\t--\t\tKZ7134\t6\t2239.00\n2026-08-22 17:25\tBKD\tBooked\tPVG(Shanghai)\tKZ0226\t6\t2239.00\n2026-08-22 17:25\tBKD\tBooked\tPVG(Shanghai)\tKZ7134\t6\t2239.00", "航班信息2": [{"file_token": "SOOdbpHC4o1kRLxXAA7cn073nDt", "name": "t17_doc_933-35146252.docx", "size": 36022, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=SOOdbpHC4o1kRLxXAA7cn073nDt", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/SOOdbpHC4o1kRLxXAA7cn073nDt/download"}], "航班号": "KZ0226 / KZ7134", "航线": "PVG-NRT-ORD", "飞常准": "（航班已飞 ATD=2026-08-23 15:24，无需飞常准查询）"}, "id": "recvt7tjcIFuqS", "record_id": "recvt7tjcIFuqS"}, {"fields": {"AI分析结果": "运单号：880-51032251\n航线：PEK-TIJ-MEX\n是否转飞：是\n是否分批：否\n头程ETD：2026-08-22 20:48\n头程ETA：2026-08-23 01:20\n头程ATD：2026-08-22 20:48\n头程ATA：2026-08-23 01:20\n二程ETD：无\n二程ETA：无\n二程ATD：无\n二程ATA：无\n航班状态：in transit\n航班号：HU7925\ndeadline校验结果：无deadline信息，不做比对\n冲突备注：同一运单各事件件重均为1件/320.00KG且同航班HU7925，未判定分批；Word中出现TIJ(Tijuana)站点及“PEK-TIJ”描述，判定存在中转/经停TIJ，但未提供TIJ-MEX二程航班及时间。Word含多个DEP时间：20:48（PEK DEP/实际起飞）、21:05（TIJ站点DEP记录）、22:04（PEK DEP记录且描述实际出发20:53）；按Word非Planned起飞记录取头程ATD 2026-08-22 20:48。截图显示ATD 2026-08-22 22:04、ETD 2026-08-22 20:48、ETA 2026-08-23 01:20；ATD与Word取值不一致，以Word为准。Word无明确Planned ETD/ETA标签，头程ETD/ETA取自截图。", "ATA": 1787419200000, "ATD": 1787402880000, "ETA": 1787419200000, "ETD": 1787402880000, "deadline校验结果": "无deadline信息，不做比对", "主单号": "880-51032251", "二程ATA": null, "二程ATD": null, "二程ETA": null, "二程ETD": null, "代理deadline": null, "冲突备注": "同一运单各事件件重均为1件/320.00KG且同航班HU7925，未判定分批；Word中出现TIJ(Tijuana)站点及“PEK-TIJ”描述，判定存在中转/经停TIJ，但未提供TIJ-MEX二程航班及时间。Word含多个DEP时间：20:48（PEK DEP/实际起飞）、21:05（TIJ站点DEP记录）、22:04（PEK DEP记录且描述实际出发20:53）；按Word非Planned起飞记录取头程ATD 2026-08-22 20:48。截图显示ATD 2026-08-22 22:04、ETD 2026-08-22 20:48、ETA 2026-08-23 01:20；ATD与Word取值不一致，以Word为准。Word无明确Planned ETD/ETA标签，头程ETD/ETA取自截图。", "启运港": "PEK (Beijing)", "客户": "银宝山新", "截图": [{"file_token": "Fy1mbkZNRoYoidx6uAUc7PsGnJh", "name": "t17_expand_880-51032251.png", "size": 92935, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=Fy1mbkZNRoYoidx6uAUc7PsGnJh", "type": "image/png", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/Fy1mbkZNRoYoidx6uAUc7PsGnJh/download"}], "是否分批": "否", "是否转运": "是", "查询完成时间": "2026-08-24 08:30:54", "查询状态": "in transit", "目的港": "MEX (Mexico City)", "航班信息": "880-51032251\nIn Transit\nPEK\n(Beijing)\nMEX\n(Mexico City)\nTotal piece\n/\nWeight:\n1 pcs\n/\n320.0 KG\nFlight no.\nHU7925\nDeparture time\nETD\n2026-08-22 20:48\nArrival time\nETA\n2026-08-23 01:20\nPiece\n1 pcs\nLatest event: 2026-08-22 21:05  DEP | HU7925,北京首都-墨西哥城,实际起飞：2026-08-22 20:48:00,实际到达：2026-08-23 01:20:00 | TIJ(Tijuana) | HU7925 | 1 pcs | 320.00 KG\nFlight details\n-\nAirline: Hainan Airlines\nPEK > MEX\nCopy details\nCopy link\nTranslate:\nEnglish\nOrigin\tDestination\tFlight no.\tDeparture time\tArrival time\tPiece\tWeight\tStatus\nPEK(Beijing)\tMEX(Mexico City)\tHU7925\n2026-08-22 20:48(ETD)\n2026-08-22 22:04(ATD)\n2026-08-23 01:20(ETA)\n--\n1\t320.0\t--\nPEK(Beijing)\tMEX(Mexico City)\tHU7925\n2026-08-22 20:48(ETD)\n--\n2026-08-23 01:20(ETA)\n--\n1\t320.0\t--\nHistory\nEvent time(Local)\tStatus\tDescription\tStation\tFlight no.\tPiece\tWeight(KG)\n2026-08-22 21:05\tDEP\tHU7925,北京首都-墨西哥城,实际起飞：2026-08-22 20:48:00,实际到达：2026-08-23 01:20:00\tTIJ(Tijuana)\tHU7925\t1\t320.00\n2026-08-22 22:04\tDEP\t离港航班：HU7925/8月22日/PEK-TIJ,实际出发20:53,计划到达01:40 +1\tPEK(Beijing)\tHU7925\t1\t320.00\n2026-08-22 20:48\tDEP\tHU7925,北京首都-墨西哥城,实际起飞：2026-08-22 20:48:00,实际到达：2026-08-23 01:20:00\tPEK(Beijing)\tHU7925\t1\t320.00\n2026-08-22 14:13\tRCS\t已于8月22日14:12收到货物\tPEK(Beijing)\t--\t1\t320.00\n2026-08-21 21:18\tRCS\t--\tPEK(Beijing)\t--\t1\t320.00", "航班信息2": [{"file_token": "WA45bPBfVov0LVxsjrJcg8AKnHl", "name": "t17_doc_880-51032251.docx", "size": 36068, "tmp_url": "https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=WA45bPBfVov0LVxsjrJcg8AKnHl", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "url": "https://open.feishu.cn/open-apis/drive/v1/medias/WA45bPBfVov0LVxsjrJcg8AKnHl/download"}], "航班号": "HU7925", "航线": "PEK-TIJ-MEX", "飞常准": "（航班已飞 ATD=2026-08-22 20:48，无需飞常准查询）"}, "id": "recvt7uIB8h24J", "record_id": "recvt7uIB8h24J"}]};</script>
+</body>
+</html>
