@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  威达内网演示 · 后端 API（6100）
+  依赖 MySQL(3306) 与 Redis(6379)，两者由 com.weida.mysql / com.weida.redis 提供；
+  启动顺序不保证，后端连不上会自己退，KeepAlive 会再过 10 秒重试，最终会起来。
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.weida.backend</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__REPO__/backend/.venv/bin/python</string>
+        <string>main.py</string>
+        <string>run</string>
+        <string>--env=dev</string>
+        <!-- 演示机必须关热重载：改一个 .py（连测试文件都算）就重启，重启的 ~2 秒里
+             所有在途请求都失败，浏览器端报 axios 的 Network Error。 -->
+        <string>--no-reload</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>__REPO__/backend</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+    <key>StandardOutPath</key>
+    <string>__HOME__/Library/Logs/weida-backend.log</string>
+    <key>StandardErrorPath</key>
+    <string>__HOME__/Library/Logs/weida-backend.log</string>
+</dict>
+</plist>

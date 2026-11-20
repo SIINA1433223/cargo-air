@@ -1,0 +1,9 @@
+# 插件元数据（可选）：供文档、运维与 module_application.portal 展示使用。
+# 不用于运行时 pip 安装依赖；依赖见仓库根目录 pyproject.toml / uv.lock。
+
+name = "feishu"
+title = "飞书多维表格"
+version = "1.0.0"
+description = "对接飞书多维表格，读写透传实现双向同步，保留飞书侧公式/查找/按钮自动化。"
+optional = true
+tags = ["feishu", "lark", "bitable"]

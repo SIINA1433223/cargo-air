@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  威达内网演示 · 前端 vite dev（6110，绑 0.0.0.0）
+
+  **已停用，install.sh 不再装载它**（列在 LEGACY_LABELS 里，只负责卸载与清理）。
+  内网演示的前端改为构建产物由后端 6100 托管（http://<主机>:6100/web），不再常驻 vite。
+
+  文件保留是给**本地开发**用的：想用 vite 的热更新，手动
+      cp deploy/launchd/com.weida.frontend.plist ~/Library/LaunchAgents/  # 先替换 __HOME__/__REPO__
+      launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.weida.frontend.plist
+  或直接 `cd frontend/web && pnpm dev`。注意两种前端同时在线时，6110 与 6100 是**两套**
+  代码，容易误判「改了没生效」。
+
+  PATH 必须显式给：launchd 不读 ~/.zshrc，默认 PATH 里没有 ~/.local/node/bin。
+  VITE_SERVER_OPEN=false 让 vite 启动时不弹浏览器（vite.config.ts 里读的就是它）。
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.weida.frontend</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__HOME__/.local/node/bin/pnpm</string>
+        <string>dev</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>__REPO__/frontend/web</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>__HOME__/.local/node/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>VITE_SERVER_OPEN</key>
+        <string>false</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+    <key>StandardOutPath</key>
+    <string>__HOME__/Library/Logs/weida-frontend.log</string>
+    <key>StandardErrorPath</key>
+    <string>__HOME__/Library/Logs/weida-frontend.log</string>
+</dict>
+</plist>

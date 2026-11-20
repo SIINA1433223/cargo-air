@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  威达内网演示 · MySQL（3306）
+  模板：安装前请把 __HOME__ / __REPO__ 换成真实路径（install.sh 会自动替换）。
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.weida.mysql</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__HOME__/.local/mysql/bin/mysqld</string>
+        <string>--basedir=__HOME__/.local/mysql</string>
+        <string>--datadir=__HOME__/.local/mysql/data</string>
+        <string>--port=3306</string>
+        <string>--socket=/tmp/mysql.sock</string>
+        <string>--log-error=__HOME__/Library/Logs/weida-mysql.log</string>
+        <string>--pid-file=__HOME__/.local/mysql/mysql.pid</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+    <key>StandardOutPath</key>
+    <string>__HOME__/Library/Logs/weida-mysql.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>__HOME__/Library/Logs/weida-mysql.err.log</string>
+</dict>
+</plist>

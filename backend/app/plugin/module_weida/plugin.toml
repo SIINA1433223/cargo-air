@@ -1,0 +1,6 @@
+name = "weida"
+title = "威达业务工作台"
+version = "0.1.0"
+description = "商机 / 订单 / iFreight 三个工作台，读写本地 biz_* 表。"
+optional = true
+tags = ["weida", "workbench"]
