@@ -3155,6 +3155,9 @@ const linkBlocks = computed(() => config.value?.link_blocks ?? [])
 const relatedBlocks = computed(() => config.value?.related_blocks ?? [])
 const visibleRelatedBlocks = computed(() =>
   relatedBlocks.value.filter((rb) => {
+    if (role.value === 'domestic_ops' && rb.key === 'insurance') {
+      return String(detail.value?.fields.need_insurance?.value ?? '').trim() === '是'
+    }
     if (!rb.when_contains) return true
     // 任一列命中（车队页：提货车队 或 二程车队 含云港先达）
     const fields = rb.when_fields?.length ? rb.when_fields : rb.when_field ? [rb.when_field] : []
@@ -3662,6 +3665,12 @@ const detailSections = computed<Array<{ label: string; fields: Col[] }>>(() => {
   const visible = new Set(Object.keys(detail.value?.fields || {}))
   const colSet = new Set(columns.value.map((c) => c.column))
   return sections
+    .filter((section) => {
+      if (role.value !== 'domestic_ops') return true
+      // 客服交接操作决定操作工作台要不要出现这两页（秒级：轮询时详情一起刷新）
+      if (section.label === '报关') return String(detail.value?.fields.need_declaration?.value ?? '').trim() === '是'
+      return true
+    })
     .map((section) => ({
       label: section.label,
       fields: section.fields.filter((f) => {
@@ -5620,6 +5629,21 @@ async function saveHandover() {
   }
 }
 
+async function refreshDetailQuietly() {
+  if (!detail.value || drawerMode.value !== 'edit') return
+  // 有没保存的改动就不刷新，免得把输入冲掉
+  if (detailSnapshot.value && JSON.stringify(editModel) !== detailSnapshot.value) return
+  try {
+    const res = await request<any>({
+      url: `/weida/${role.value}/records/${detail.value.id}`,
+      method: 'get',
+    })
+    if (res.data?.data) detail.value = res.data.data
+  } catch {
+    /* 静默：下一轮再试 */
+  }
+}
+
 async function refreshDetail() {
   if (!detail.value) return
   await openDetail({ id: detail.value.id, fields: {} })
@@ -7287,7 +7311,10 @@ function startPolling() {
   // 客服/航线 5 秒，国内操作 8 秒（整表不翻页，稍慢一点）
   const interval = role.value === 'domestic_ops' ? 8000 : 5000
   pollTimer = window.setInterval(() => {
-    if (document.visibilityState === 'visible' && !loading.value && !saving.value) load(true)
+    if (document.visibilityState !== 'visible' || loading.value || saving.value) return
+    void load(true)
+    // 抽屉开着时把详情也换一份：客服改了「是否需要投保/代报关」，操作这边几秒内就看到页签变化
+    if (drawerOpen.value && detail.value) void refreshDetailQuietly()
   }, interval)
 }
 
