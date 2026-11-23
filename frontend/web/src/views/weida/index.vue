@@ -1754,11 +1754,11 @@
                                 :label="o"
                                 :value="o" />
                             </el-select>
-                            <el-input
+                            <input
                               v-else
-                              size="small"
-                              :model-value="row.fields[f.column]?.value ?? ''"
-                              @change="(v: string) => saveRelatedField(rb, row, f.column, v)" />
+                              class="wb-native-input"
+                              :value="row.fields[f.column]?.value ?? ''"
+                              @change="(e: any) => saveRelatedField(rb, row, f.column, e.target.value)" />
                           </div>
                         </div>
                       </div>
@@ -1776,11 +1776,11 @@
                       :model-value="row.fields.master_no?.value ?? ''"
                       size="small"
                       @change="(v: string) => saveMasterNo(rb, row, v)" />
-                    <el-input
+                    <input
                       v-else-if="relatedColumnEditable(rb, c.column)"
-                      :model-value="row.fields[c.column]?.value ?? ''"
-                      size="small"
-                      @change="(v: string) => saveRelatedField(rb, row, c.column, v)" />
+                      class="wb-native-input"
+                      :value="row.fields[c.column]?.value ?? ''"
+                      @change="(e: any) => saveRelatedField(rb, row, c.column, e.target.value)" />
                     <span v-else class="wb-order-readonly">
                       {{ display(row.fields[c.column]?.value, c.type) }}
                     </span>
@@ -3691,7 +3691,13 @@ async function loadFieldOptions() {
     columns.map(async (column) => {
       try {
         if (column === 'destination_port') {
-          fieldOptions.destination_port = []
+          // 目的港一次性取全量（约 5700 个三字码），新建/筛选直接可选
+          const ports = await request<any>({
+            url: '/weida/port-options',
+            method: 'get',
+            params: { limit: 7000 },
+          })
+          fieldOptions.destination_port = ports.data?.data ?? []
           return
         }
         const res = await request<any>({
@@ -8263,6 +8269,25 @@ onUnmounted(() => {
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px dashed #e5dfd3;
+}
+.wb-native-input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #303133;
+  background: #fff;
+}
+.wb-native-input:focus {
+  outline: none;
+  border-color: #409eff;
+}
+.wb-ifreight-expand {
+  position: relative;
+  z-index: 2;
 }
 .wb-ifreight-detail {
   padding: 8px 14px;
