@@ -255,13 +255,6 @@
                     {{ record.fields.single_status.value }}
                   </span>
                   <span v-else class="cell-empty">—</span>
-                  <!-- 整格可点：点状态格任意处都弹「这票的提醒」对话框（与妙搭一致） -->
-                  <span
-                    v-if="activeAlerts(record).length"
-                    class="wb-alert-dot"
-                    :class="activeAlerts(record)[0].severity === 'critical' ? 'is-critical' : 'is-warning'">
-                    !
-                  </span>
                   <span v-if="record.weekend_check?.pending" class="wb-weekend-dot" title="周末/节假日进仓待确认" @click.stop="openWeekend(record)">!</span>
                   <span v-if="record.flight_changed" class="wb-flight-changed">航班更新</span>
                   <span
@@ -269,6 +262,13 @@
                     class="wb-flight-status"
                     :class="record.fields.flight_status?.value ? flightStatusClass(record.fields.flight_status.value) : 'is-empty'">
                     {{ record.fields.flight_status?.value || '航班状态' }}
+                  </span>
+                  <!-- 提醒叹号放最右边空白处（不夹在状态与航班状态之间），整格可点弹「这票的提醒」 -->
+                  <span
+                    v-if="activeAlerts(record).length"
+                    class="wb-alert-dot is-right"
+                    :class="activeAlerts(record)[0].severity === 'critical' ? 'is-critical' : 'is-warning'">
+                    !
                   </span>
                 </div>
               </template>
@@ -7509,6 +7509,9 @@ onUnmounted(disconnectEvents)
 }
 .wb-flight-status.is-info {
   color: #1570ef;
+}
+.wb-alert-dot.is-right {
+  margin-left: auto;
 }
 .wb-alert-dot {
   display: inline-flex;
