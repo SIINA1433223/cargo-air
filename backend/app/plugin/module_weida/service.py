@@ -6662,10 +6662,17 @@ async def update_related_record(
         sets = ", ".join(f"`{k}` = :{k}" for k in clean)
         params = dict(clean)
         params["id"] = row_id
-        await session.execute(
-            text(f"UPDATE `{rb.table}` SET {sets} WHERE id = :id AND is_deleted = 0"),
-            params,
-        )
+        try:
+            await session.execute(
+                text(f"UPDATE `{rb.table}` SET {sets} WHERE id = :id AND is_deleted = 0"),
+                params,
+            )
+        except Exception as exc:  # 写不进去时说清楚是哪一列、什么值
+            await session.rollback()
+            raise HTTPException(
+                status_code=422,
+                detail=f"保存失败（{rb.label}）：{type(exc).__name__}: {str(exc)[:200]}",
+            ) from exc
         if rb.table == "biz_ifreight" and "house_bl_no" in clean:
             await session.execute(
                 text(
