@@ -113,7 +113,18 @@
           label="单票状态"
           :cell-class-name="alertCellClass">
           <template #default="{ row }">
-            <WeidaStatusTag :status="row.single_status" />
+            <!--
+              整格可点：有提醒时点这一格（含闪烁的那圈）就弹提醒列表，
+              与妙搭一致（用户 2026-11-23：「点击不会有提醒列表，需要点红色叹号才有」）。
+              没有提醒时保持原样，点击照旧冒泡去开详情。
+            -->
+            <span
+              v-if="alertsOf(row).length"
+              class="alert-trigger"
+              @click.stop="openAlerts(row)">
+              <WeidaStatusTag :status="row.single_status" />
+            </span>
+            <WeidaStatusTag v-else :status="row.single_status" />
           </template>
         </ElTableColumn>
 
@@ -1126,6 +1137,11 @@ function isDismissed(row: BitableRecord, a: WbAlert): boolean {
 const alertDialogVisible = ref(false)
 const alertDialogRow = ref<BitableRecord | null>(null)
 
+function openAlerts(row: BitableRecord): void {
+  alertDialogRow.value = row
+  alertDialogVisible.value = true
+}
+
 function onStatusCellClick(row: BitableRecord, column: { label?: string }): void {
   if (column?.label !== '单票状态') return
   if (alertsOf(row).length === 0) return
@@ -1442,6 +1458,8 @@ onMounted(reload)
 .cell-template {
   white-space: pre-line;
 }
+
+.alert-trigger { display: block; width: 100%; height: 100%; cursor: pointer; }
 
 .wb-alerts { display: flex; flex-direction: column; gap: 10px; }
 .wb-alert-item { border: 1px solid var(--el-border-color); border-radius: 6px; padding: 10px; }
