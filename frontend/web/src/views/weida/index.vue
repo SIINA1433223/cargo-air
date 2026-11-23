@@ -2900,7 +2900,10 @@ function colField(key: string): string {
 }
 function colType(key: string): string {
   const c = colOf(key)
-  return c && c.kind === 'field' ? c.type : 'text'
+  if (!c || c.kind !== 'field') return 'text'
+  // 客服台「货好时间」只到日（用户 2026-11-23）
+  if (role.value === 'customer_service' && c.column === 'goods_ready_time') return 'date'
+  return c.type
 }
 function colExpression(key: string): string {
   const c = colOf(key)
