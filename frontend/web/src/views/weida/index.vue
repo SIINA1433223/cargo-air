@@ -3051,6 +3051,8 @@ const antColumns = computed<any[]>(() => {
       customCell: (record: Row) => ({
         style: paintCellStyle({ row: record, column: { property: prop } }),
         onClick: () => onCellClick(record, { property: prop }),
+        // 双击也进编辑（日期这类字段用户习惯双击）
+        onDblclick: () => onCellClick(record, { property: prop }),
       }),
       customHeaderCell: () => ({
         draggable: true,

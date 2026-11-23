@@ -1366,8 +1366,14 @@ async def _ops_bill_status(session: AsyncSession, rows: list[Any]) -> dict[int, 
     bills: dict[int, dict[str, bool]] = {}
     result = await session.execute(
         text(
-            "SELECT l.from_id, MAX(IFNULL(i.domestic_bill_entry,0)) AS domestic, "
-            "MAX(IFNULL(i.foreign_bill_entry,0)) AS foreign_bill "
+            # 有没有账单看的是 iFreight 上的账单附件（和妙搭同一判据）；
+            # 之前读的是 domestic_bill_entry 标志列，线上这些列几乎全空，
+            # 于是 300 多票全显示「没有国内账单」——账单状态看起来像没同步。
+            "SELECT l.from_id, "
+            "MAX(EXISTS(SELECT 1 FROM biz_attachment a WHERE a.owner_table='ifreight' "
+            "  AND a.owner_id=i.id AND a.field='账单附件')) AS domestic, "
+            "MAX(EXISTS(SELECT 1 FROM biz_attachment a WHERE a.owner_table='ifreight' "
+            "  AND a.owner_id=i.id AND a.field='国外账单附件')) AS foreign_bill "
             "FROM biz_link l JOIN biz_ifreight i ON i.id=l.to_id AND i.is_deleted=0 "
             "WHERE l.from_table='order' AND l.to_table='ifreight' "
             "AND l.field='所属订单' AND l.from_id IN :ids GROUP BY l.from_id"
