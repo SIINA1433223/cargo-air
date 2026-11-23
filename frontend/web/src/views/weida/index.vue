@@ -309,22 +309,25 @@
                   class="wb-inline-size">
                   <!-- 按字段类型给控件：日期弹日期面板、单选取值弹下拉、人/客商弹选择器，
                        别的才是文本框（妙搭 EditableCell 同一套口径） -->
-                  <a-date-picker
+                  <!-- 日期用 Element 面板（接受字符串值，选完即存） -->
+                  <el-date-picker
                     v-if="inlineEdit.type === 'date'"
-                    :value="inlineEditValue ? dayjs(inlineEditValue) : null"
+                    v-model="inlineEditValue"
+                    type="date"
+                    value-format="YYYY-MM-DD"
                     size="small"
                     style="width: 100%"
                     @click.stop
-                    @change="(v: any) => setInlineDate(v, 'YYYY-MM-DD')" />
-                  <a-date-picker
+                    @change="saveInlineEdit" />
+                  <el-date-picker
                     v-else-if="inlineEdit.type === 'datetime'"
-                    :value="inlineEditValue ? dayjs(inlineEditValue) : null"
-                    size="small"
-                    show-time
+                    v-model="inlineEditValue"
+                    type="datetime"
                     value-format="YYYY-MM-DD HH:mm:ss"
+                    size="small"
                     style="width: 100%"
                     @click.stop
-                    @change="(v: any, s: string) => setInlineDate(v, 'YYYY-MM-DD HH:mm:ss', s)" />
+                    @change="saveInlineEdit" />
                   <a-select
                     v-else-if="inlinePersonColumns.has(inlineEdit.column || '')"
                     v-model:value="inlineEditValue"
