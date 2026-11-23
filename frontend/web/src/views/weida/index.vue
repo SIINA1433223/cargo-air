@@ -1599,12 +1599,24 @@
                         <div v-for="(line, li) in ifreightDetailRows" :key="li" class="wb-ifreight-detail-row">
                           <div v-for="f in line" :key="f.column" class="wb-ifreight-detail-field">
                             <span>{{ f.label }}</span>
+                            <div v-if="f.column === 'dimension'" class="wb-size-edit">
+                              <el-input
+                                type="textarea"
+                                :rows="2"
+                                size="small"
+                                :model-value="row.fields.dimension?.value ?? ''"
+                                @change="(v: string) => saveRelatedField(rb, row, 'dimension', v)" />
+                              <el-button size="small" @click="calcIfreightVolume(rb, row)">计算</el-button>
+                            </div>
+                            <div
+                              v-else-if="['master_no','sync_status','sync_time','fail_reason','ai_recognize_result'].includes(f.column)">
+                              {{ display(row.fields[f.column]?.value, 'text') || '—' }}
+                            </div>
                             <el-input
-                              v-if="!['master_no','customer_billing_weight','agent_billing_weight','sync_status','sync_time','fail_reason','ai_recognize_result'].includes(f.column)"
+                              v-else
                               size="small"
                               :model-value="row.fields[f.column]?.value ?? ''"
                               @change="(v: string) => saveRelatedField(rb, row, f.column, v)" />
-                            <div v-else>{{ display(row.fields[f.column]?.value, 'text') || '—' }}</div>
                           </div>
                         </div>
                       </div>
@@ -3126,19 +3138,21 @@ const billlibOpen = ref(false)
 const billlibValue = ref<number | null>(null)
 const billlibTarget = ref<RelatedRow | null>(null)
 const ifreightDetailRows = [
+  // 照妙搭 detailRows 逐行摆（一行 2~4 格）
   [{ column: 'document_type', label: '单据类型' }, { column: 'house_bl_no', label: '分单号' }, { column: 'cargo_receiving_method', label: '揽货方式' }, { column: 'master_no', label: '主单号' }],
   [{ column: 'business_type', label: '业务类型' }, { column: 'customer_ref_no', label: '客户 REF NO.' }],
   [{ column: 'client_name', label: '委托人名称' }, { column: 'client_address', label: '委托人地址' }],
   [{ column: 'shipper_name', label: '发货人名称' }, { column: 'shipper_address', label: '发货人地址' }],
   [{ column: 'consignee_name', label: '收货人名称' }, { column: 'consignee_address', label: '收货人地址' }],
-  [{ column: 'airline_company', label: '航空公司' }],
+  [{ column: 'foreign_agent', label: '国外代理' }, { column: 'airline_company', label: '航空公司' }],
   [{ column: 'notify_party_name', label: '通知人名称' }, { column: 'notify_party_address', label: '通知人地址' }],
+  [{ column: 'booking_agent', label: '订舱代理' }],
   [{ column: 'quantity', label: '件数' }, { column: 'route', label: '航线' }],
   [{ column: 'gross_weight', label: '毛重' }, { column: 'volume', label: '体积' }],
-  [{ column: 'origin_city_code', label: '起运地城市代码' }, { column: 'flight_number', label: '航班号' }],
+  [{ column: 'origin_city_code', label: '起运地城市代码' }, { column: 'flight_number', label: '航班号' }, { column: 'estimated_departure_time', label: '预计起运时间' }],
   [{ column: 'dest_city_code', label: '目的地城市代码' }, { column: 'estimated_arrival_time', label: '预计到港时间' }, { column: 'pp_currency', label: 'PP币别' }],
   [{ column: 'freight_payment_method', label: '运费付款方式' }, { column: 'surcharge_payment_method', label: '杂费付款方式' }],
-  [{ column: 'domestic_operation', label: '国内操作' }, { column: 'business_department', label: '业务所属部门' }],
+  [{ column: 'sales_person', label: '业务员' }, { column: 'domestic_operation', label: '国内操作' }, { column: 'opportunity_person', label: '商机负责人' }, { column: 'business_department', label: '业务所属部门' }],
   [{ column: 'customer_billing_weight', label: '客户计费重' }, { column: 'agent_billing_weight', label: '代理计费重' }],
   [{ column: 'shipping_mark', label: '唛头' }, { column: 'goods_description', label: '货品描述' }],
   [{ column: 'dimension', label: '尺寸' }],
@@ -6496,6 +6510,44 @@ async function savePlanField(row: RelatedRow, column: string, value: any) {
   }
 }
 
+function parseSizeVolume(text: string): { volume: number; sizes: string } | null {
+  // 与妙搭 parseSizes / parseSizeGroups 同一套：一组 `长*宽*高[*件数]`，单位厘米
+  const groups = text
+    .split(/[\s,;，；、]+/)
+    .map((x) => x.trim())
+    .filter(Boolean)
+  if (!groups.length) return null
+  let total = 0
+  const normalized: string[] = []
+  for (const group of groups) {
+    const parts = group.split(/[*xX×]/).map((x) => Number(x))
+    if (parts.length < 3 || parts.length > 4) return null
+    if (parts.some((n) => !Number.isFinite(n) || n <= 0)) return null
+    const [l, w, h, n = 1] = parts
+    total += (l / 100) * (w / 100) * (h / 100) * n
+    normalized.push(parts.join('*'))
+  }
+  return { volume: Math.round(total * 1000) / 1000, sizes: normalized.join('\n') }
+}
+
+async function calcIfreightVolume(rb: RelatedBlock, row: RelatedRow) {
+  const text = String(row.fields.dimension?.value ?? '')
+  const parsed = parseSizeVolume(text)
+  if (!parsed) {
+    ElMessage.warning('尺寸格式认不出：一组写 长*宽*高 或 长*宽*高*件数，多个尺寸用空格/逗号/换行分隔')
+    return
+  }
+  const factor = 167
+  const weight = Math.ceil(Math.round(parsed.volume * factor * 1e6) / 1e6 * 2 - 1e-9) / 2
+  const gross = Number(row.fields.gross_weight?.value ?? 0)
+  const billing = gross > 0 ? Math.max(weight, Math.ceil(gross * 2 - 1e-9) / 2) : weight
+  await saveRelatedField(rb, row, 'dimension', parsed.sizes)
+  await saveRelatedField(rb, row, 'volume', String(parsed.volume))
+  await saveRelatedField(rb, row, 'volume_weight', String(weight))
+  await saveRelatedField(rb, row, 'customer_billing_weight', String(billing))
+  ElMessage.success(`体积 ${parsed.volume} m³，客户计费重 ${billing} kg`)
+}
+
 async function saveRelatedField(rb: RelatedBlock, row: RelatedRow, column: string, value: string) {
   if (!detail.value) return
   try {
@@ -6507,7 +6559,7 @@ async function saveRelatedField(rb: RelatedBlock, row: RelatedRow, column: strin
     row.fields[column] = { label: column, value }
     if (
       rb.key === 'ifreight' &&
-      ['quantity', 'gross_weight', 'volume', 'dimension', 'house_bl_no'].includes(column) &&
+      ['quantity', 'gross_weight', 'volume', 'dimension', 'house_bl_no', 'volume_weight', 'customer_billing_weight'].includes(column) &&
       detail.value
     ) {
       const fresh = await request<any>({
@@ -7739,6 +7791,39 @@ onUnmounted(disconnectEvents)
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px dashed #e5dfd3;
+}
+.wb-ifreight-detail {
+  padding: 8px 14px;
+}
+.wb-ifreight-detail-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-bottom: 4px;
+}
+.wb-ifreight-detail-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 220px;
+  min-width: 200px;
+  max-width: 420px;
+}
+.wb-ifreight-detail-field > span {
+  flex: 0 0 96px;
+  font-size: 12px;
+  color: #8a8378;
+  text-align: right;
+  white-space: nowrap;
+}
+.wb-ifreight-detail-field :deep(.el-input),
+.wb-ifreight-detail-field :deep(.el-textarea) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.wb-ifreight-detail-field.wb-ops-wide {
+  flex-basis: 100%;
+  max-width: none;
 }
 .wb-ins-grid {
   display: grid;
