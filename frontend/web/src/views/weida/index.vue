@@ -241,7 +241,7 @@
             :pagination="false"
             :row-key="(record: Row) => record.id"
             :custom-row="antCustomRow"
-            :scroll="{ x: 'max-content', y: 'calc(100vh - 205px)' }"
+            :scroll="{ x: 'max-content', y: tableScrollY }"
             size="small"
             bordered>
             <template #bodyCell="{ column, record, index }">
@@ -2720,6 +2720,11 @@ const columnWidths = ref<Record<string, number>>({})
 const rowHeight = ref(54)
 const ZOOM_OPTIONS = [70, 80, 90, 100, 110, 120, 130, 150]
 const tableZoom = ref(100)
+
+// 缩放后表格内部可用高度要换算回「未缩放」的 px，否则缩小只留白、不多显示行
+const tableScrollY = computed(
+  () => `calc((100vh - 205px) * ${(100 / tableZoom.value).toFixed(4)})`,
+)
 
 function saveTableZoom() {
   localStorage.setItem(`weida_zoom:${role.value}`, String(tableZoom.value))
