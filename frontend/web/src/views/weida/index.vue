@@ -1441,6 +1441,7 @@
                 v-if="rb.key === 'arrival_report'"
                 v-loading="relatedLoading[rb.key]"
                 :data="relatedData[rb.key] || []"
+                :row-key="(row: any) => row.id"
                 size="small"
                 border>
                 <el-table-column type="index" label="序号" width="48" />
@@ -1542,6 +1543,7 @@
                 v-else-if="rb.key === 'insurance'"
                 v-loading="relatedLoading[rb.key]"
                 :data="relatedData[rb.key] || []"
+                :row-key="(row: any) => row.id"
                 size="small"
                 border>
                 <el-table-column type="expand" width="44">
@@ -1568,6 +1570,7 @@
                 v-else-if="rb.key !== 'fleet'"
                 v-loading="relatedLoading[rb.key]"
                 :data="relatedData[rb.key] || []"
+                :row-key="(row: any) => row.id"
                 size="small"
                 border>
                 <el-table-column v-if="rb.key === 'ifreight'" type="expand" width="44">
@@ -1672,7 +1675,11 @@
                   </div>
               </div>
                       <div class="wb-ifreight-detail">
-                        <div v-for="(line, li) in ifreightDetailRows" :key="li" class="wb-ifreight-detail-row">
+                        <div
+                          v-for="(line, li) in ifreightDetailRows"
+                          :key="li"
+                          class="wb-ifreight-detail-row"
+                          :style="{ '--cols': line.length }">
                           <div v-for="f in line" :key="f.column" class="wb-ifreight-detail-field">
                             <span>{{ f.label }}</span>
                             <div v-if="f.column === 'dimension'" class="wb-size-edit">
@@ -1692,6 +1699,14 @@
                               size="small"
                               style="width: 100%"
                               @change="(v: string) => saveRelatedField(rb, row, 'estimated_arrival_time', v)" />
+                            <el-date-picker
+                              v-else-if="f.column === 'estimated_departure_time'"
+                              :model-value="String(row.fields[f.column]?.value ?? '').replace('T', ' ').slice(0, 19)"
+                              type="datetime"
+                              value-format="YYYY-MM-DD HH:mm:ss"
+                              size="small"
+                              style="width: 100%"
+                              @change="(v: string) => saveRelatedField(rb, row, 'estimated_departure_time', v)" />
                             <el-input
                               v-else-if="f.column === 'master_no'"
                               size="small"
@@ -1754,6 +1769,12 @@
                                 :label="o"
                                 :value="o" />
                             </el-select>
+                            <textarea
+                              v-else-if="IFREIGHT_MULTILINE.has(f.column)"
+                              class="wb-native-input wb-native-area"
+                              rows="2"
+                              :value="row.fields[f.column]?.value ?? ''"
+                              @change="(e: any) => saveRelatedField(rb, row, f.column, e.target.value)" />
                             <input
                               v-else
                               class="wb-native-input"
@@ -3326,6 +3347,15 @@ const billlibTarget = ref<RelatedRow | null>(null)
 // iFreight 展开体上的字段类型（妙搭里全是选项/人员/客商/三字代码，不该是自由输入）
 const IFREIGHT_PERSON_COLUMNS = new Set(['sales_person', 'opportunity_person', 'domestic_operation'])
 const IFREIGHT_VENDOR_COLUMNS = new Set(['foreign_agent', 'booking_agent'])
+const IFREIGHT_MULTILINE = new Set([
+  'client_address',
+  'shipper_address',
+  'consignee_address',
+  'notify_party_address',
+  'goods_description',
+  'shipping_mark',
+  'remark',
+])
 const IFREIGHT_CITY_COLUMNS = new Set(['origin_city_code', 'dest_city_code'])
 const IFREIGHT_OPTION_COLUMNS = [
   'document_type',
@@ -8293,25 +8323,30 @@ onUnmounted(() => {
   padding: 8px 14px;
 }
 .wb-ifreight-detail-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 18px;
-  margin-bottom: 4px;
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr));
+  gap: 12px 28px;
+  margin-bottom: 14px;
 }
 .wb-ifreight-detail-field {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1 1 220px;
-  min-width: 200px;
-  max-width: 420px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  min-width: 0;
 }
 .wb-ifreight-detail-field > span {
-  flex: 0 0 96px;
   font-size: 12px;
   color: #8a8378;
-  text-align: right;
   white-space: nowrap;
+}
+.wb-native-area {
+  height: auto;
+  min-height: 46px;
+  padding: 4px 6px;
+  line-height: 1.4;
+  resize: vertical;
+  font-family: inherit;
 }
 .wb-ifreight-detail-field :deep(.el-input),
 .wb-ifreight-detail-field :deep(.el-textarea) {

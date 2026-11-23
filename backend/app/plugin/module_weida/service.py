@@ -2176,11 +2176,14 @@ async def _propagate_shared(
     ]
     if not ids:
         return []
+    # 对端表不一定有同名列（例如商机没有 goods_data / 订单没有 destination_port 的写法），
+    # 只同步对端真实存在的列，否则 UPDATE 直接 1054 报错（保存看似成功、实际 500）。
+    target_meta = await get_table_meta(session, target)
     sets: list[str] = []
     params: dict[str, Any] = {}
     for col, value in payload.items():
         target_col = column_map.get(col)
-        if not target_col:
+        if not target_col or target_col not in target_meta:
             continue
         sets.append(f"`{target_col}` = :{target_col}")
         params[target_col] = value
