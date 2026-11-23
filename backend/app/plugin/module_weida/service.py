@@ -2153,11 +2153,36 @@ OPTION_COLUMNS = {
 }
 
 
+REF_OPTION_KINDS = {
+    ("biz_ifreight", "document_type"): "单据类型",
+    ("biz_ifreight", "cargo_receiving_method"): "揽货方式",
+    ("biz_ifreight", "business_type"): "业务类型",
+    ("biz_ifreight", "business_department"): "业务所属部门",
+    ("biz_ifreight", "route"): "航线",
+    ("biz_ifreight", "airline_company"): "航空公司",
+    ("biz_ifreight", "piece_unit"): "件数单位",
+}
+
+
 async def list_column_options(
     table: str, column: str, keyword: str | None = None, limit: int = 100
 ) -> list[str]:
     if (table, column) not in OPTION_COLUMNS:
         raise HTTPException(status_code=422, detail="不支持的选项字段")
+    # 基础资料里有同步好的选项时优先用它（可维护）；没同步过再退回飞书/本地值
+    kind = REF_OPTION_KINDS.get((table, column))
+    if kind:
+        try:
+            from .option_sync import ref_options
+
+            rows = await ref_options(kind)
+            if rows:
+                values = [row["value"] for row in rows if row.get("value")]
+                if keyword:
+                    values = [v for v in values if keyword.strip() in v]
+                return values[:limit]
+        except Exception:
+            pass
     if table == "biz_opportunity" and column == "destination_port":
         where = "active = 1"
         params: dict[str, Any] = {"limit": limit}

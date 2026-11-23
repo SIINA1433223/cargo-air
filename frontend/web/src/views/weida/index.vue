@@ -1568,7 +1568,21 @@
                     </div>
                     <div class="wb-ops-field">
                       <span class="wb-ops-label">提示词类型</span>
-                      <el-input v-model="ifreightCard[row.id].prompt_type" size="small" />
+                      <!-- 与飞书查找引用一致：选类型 → 自动带出提示词正文 -->
+                      <el-select
+                        v-model="ifreightCard[row.id].prompt_type"
+                        size="small"
+                        filterable
+                        clearable
+                        allow-create
+                        placeholder="选择提示词类型"
+                        @change="(v: string) => applyPromptTemplate(row, v)">
+                        <el-option
+                          v-for="tpl in promptTemplates"
+                          :key="tpl.type_name + (tpl.customer || '')"
+                          :label="tpl.customer ? `${tpl.type_name}（客户专用）` : tpl.type_name"
+                          :value="tpl.type_name" />
+                      </el-select>
                     </div>
                     <div class="wb-ops-field">
                       <span class="wb-ops-label">提示词</span>
@@ -3213,6 +3227,31 @@ const IFREIGHT_OPTION_COLUMNS = [
   'piece_unit',
 ] as const
 const ifreightOptions = reactive<Record<string, string[]>>({})
+const promptTemplates = ref<Array<{ type_name: string; customer?: string | null; prompt?: string }>>([])
+
+async function loadPromptTemplates() {
+  try {
+    const res = await request<any>({
+      url: '/weida/prompts',
+      method: 'get',
+      params: { kind: '委托书' },
+    })
+    promptTemplates.value = res.data?.data ?? []
+  } catch {
+    promptTemplates.value = []
+  }
+}
+
+async function applyPromptTemplate(row: RelatedRow, typeName: string) {
+  if (!typeName) return
+  const tpl = promptTemplates.value.find((t) => t.type_name === typeName)
+  if (!tpl?.prompt) return
+  ifreightCard[row.id].prompt = tpl.prompt
+  await saveRelatedField(row as any, row, 'prompt_type', typeName)
+  await saveRelatedField(row as any, row, 'prompt', tpl.prompt)
+}
+
+
 
 async function loadIfreightOptions() {
   await Promise.all(
@@ -5065,6 +5104,7 @@ async function openDetail(row: Row) {
         loadDetailAttachment('头程入货通知'),
         loadDetailAttachment('二程入货通知'),
         void loadIfreightOptions(),
+        void loadPromptTemplates(),
         loadDetailAttachment('国内邮件'),
         loadDetailAttachment('国外邮件'),
         loadDetailAttachment('相关资料'),

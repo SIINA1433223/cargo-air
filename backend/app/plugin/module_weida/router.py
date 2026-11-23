@@ -761,6 +761,29 @@ async def arrival_report(order_id: int) -> Any:
     )
 
 
+@WeidaRouter.get("/ref-options", summary="基础资料：选项与编码")
+async def ref_options_route(kind: Annotated[str, Query()] = "") -> Any:
+    from .option_sync import ref_options
+
+    return SuccessResponse(data=await ref_options(kind))
+
+
+@WeidaRouter.get("/prompts", summary="基础资料：识别提示词")
+async def prompts_route(kind: Annotated[str, Query()] = "委托书") -> Any:
+    from .option_sync import prompt_templates
+
+    return SuccessResponse(data=await prompt_templates(kind))
+
+
+@WeidaRouter.post("/ref-options/sync", summary="从飞书同步选项/提示词到基础资料")
+async def ref_options_sync_route() -> Any:
+    from .option_sync import sync_options, sync_prompts
+
+    options = await sync_options()
+    prompts = await sync_prompts()
+    return SuccessResponse(data={"options": options, "prompts": prompts}, msg="已同步")
+
+
 @WeidaRouter.post(
     "/domestic_ops/ifreight/{ifreight_id}/sync-ifreight",
     summary="同步到 iFreight（SaveAirBooking，Java 引擎契约）",

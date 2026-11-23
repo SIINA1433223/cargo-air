@@ -63,12 +63,26 @@ def _text(value: Any) -> str:
     return str(value).strip()
 
 
-def _option_maps() -> dict[str, dict[str, str]]:
+async def _option_maps() -> dict[str, dict[str, str]]:
     """中文选项 → iFreight 编码（单据类型/揽货方式/业务类型/部门/航线）。"""
     global _option_cache
     now = time.time()
     if _option_cache and now - _option_cache[0] < 600:
         return _option_cache[1]
+    # 优先用「基础资料」里已同步的选项；没同步过再回飞书读
+    try:
+        from .option_sync import ref_options
+
+        local: dict[str, dict[str, str]] = {}
+        for kind in ("单据类型", "揽货方式", "业务类型", "业务所属部门", "航线"):
+            rows = await ref_options(kind)
+            if rows:
+                local[kind] = {r["value"]: (r.get("code") or r["value"]) for r in rows}
+        if local:
+            _option_cache = (now, local)
+            return local
+    except Exception:
+        pass
     env = fs.load_env()
     token = fs.token(env)
     items = fs.records(token, fs.MAIN, OPTION_TABLE)
@@ -226,7 +240,7 @@ async def sync_ifreight(ifreight_id: int) -> dict[str, Any]:
     if not env.get("IFREIGHT_URL") or not env.get("IFREIGHT_APP_KEY"):
         raise ValueError("iFreight 凭证未配置")
     data = await _load_order(ifreight_id)
-    maps = _option_maps()
+    maps = await _option_maps()
     body = build_body(data["order"], data["row"], maps)
     body_text = json.dumps(body, ensure_ascii=False, separators=(",", ":"))
     status, reason, bl_no, request_json = "成功", "", "", body_text
