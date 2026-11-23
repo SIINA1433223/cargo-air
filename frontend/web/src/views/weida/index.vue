@@ -3259,7 +3259,7 @@ async function loadIfreightOptions() {
       if (ifreightOptions[column]?.length) return
       try {
         const res = await request<any>({
-          url: '/weida/column-options',
+          url: '/weida/options',
           method: 'get',
           params: { table: 'biz_ifreight', column },
         })
