@@ -1,0 +1,25 @@
+{
+  "name": "weida-doc-renderer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "威达九种单据的独立渲染器（主单/分单/舱单/Booking/到货预报表）",
+  "main": "run.js",
+  "bin": {
+    "weida-docs": "run.js"
+  },
+  "scripts": {
+    "build": "esbuild src/run.ts --bundle --platform=node --format=cjs --target=node20 --outfile=run.js",
+    "example": "node run.js ../案例/输入/示例输入.json ../案例/输出"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "fontkit": "^2.0.4",
+    "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

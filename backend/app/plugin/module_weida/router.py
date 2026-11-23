@@ -761,6 +761,28 @@ async def arrival_report(order_id: int) -> Any:
     )
 
 
+@WeidaRouter.get(
+    "/domestic_ops/orders/{order_id}/doc",
+    summary="生成单据（主单/分单/舱单/booking/到货预报表）",
+)
+async def generate_doc(
+    order_id: int,
+    kind: Annotated[str, Query()] = "mawb",
+) -> Any:
+    from .docgen import render_documents
+
+    kinds = [k.strip() for k in kind.split(",") if k.strip()]
+    try:
+        data, filename, mime = await render_documents(order_id, kinds)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return Response(
+        content=data,
+        media_type=mime,
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+    )
+
+
 @WeidaRouter.post(
     "/domestic_ops/orders/{order_id}/ifreight",
     summary="新增分单",

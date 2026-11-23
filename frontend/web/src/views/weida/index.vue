@@ -1541,10 +1541,15 @@
                         <el-button size="small">生成 ▾</el-button>
                         <template #dropdown>
                           <el-dropdown-menu>
-                            <el-dropdown-item command="mawb" disabled>主单</el-dropdown-item>
-                            <el-dropdown-item command="hawb" disabled>分单</el-dropdown-item>
-                            <el-dropdown-item command="manifest" disabled>舱单</el-dropdown-item>
+                            <el-dropdown-item command="mawb">主单</el-dropdown-item>
+                            <el-dropdown-item command="mawbVerify">客户核对主单</el-dropdown-item>
+                            <el-dropdown-item command="hawb">分单</el-dropdown-item>
+                            <el-dropdown-item command="hawbVerify">客户核对分单</el-dropdown-item>
+                            <el-dropdown-item command="hawbRandom">随机分单</el-dropdown-item>
+                            <el-dropdown-item command="manifest">舱单</el-dropdown-item>
+                            <el-dropdown-item command="manifestRandom">随机舱单</el-dropdown-item>
                             <el-dropdown-item command="booking">空运booking</el-dropdown-item>
+                            <el-dropdown-item command="arrival">到货预报表</el-dropdown-item>
                           </el-dropdown-menu>
                         </template>
                       </el-dropdown>
@@ -3161,6 +3166,7 @@ const initialBottomDone = ref(false)
 const tailOffset = ref(0)
 const earlierBusy = ref(false)
 const arrivalBusy = ref(false)
+const docBusy = ref('')
 const aiBusy = ref<number | null>(null)
 const aiFees = ref<Record<string, any>[]>([])
 const aiFeesLoading = ref(false)
@@ -6495,11 +6501,43 @@ async function saveIfreightCard(row: RelatedRow) {
 }
 
 async function onDocCommand(row: RelatedRow, cmd: string) {
-  if (cmd === 'booking') {
-    await generateOrderBooking({ id: detail.value?.id || 0, fields: {} } as RelatedRow)
-    return
+  const orderId = detail.value?.id
+  if (!orderId) return
+  docBusy.value = cmd
+  try {
+    const res = await fetch(`/api/v1/weida/domestic_ops/orders/${orderId}/doc?kind=${cmd}`, {
+      headers: { Authorization: `Bearer ${Auth.getAccessToken()}` },
+    })
+    if (!res.ok) {
+      let detailText = '单据生成失败'
+      try {
+        const payload = await res.json()
+        detailText = payload?.detail || detailText
+      } catch {
+        /* 非 JSON 就沿用默认文案 */
+      }
+      ElMessage.error(detailText)
+      return
+    }
+    const blob = await res.blob()
+    const disposition = res.headers.get('Content-Disposition') || ''
+    const match = /filename\*=UTF-8''([^;]+)/.exec(disposition)
+    const fallback = `${cmd}-${orderId}.${blob.type === 'application/pdf' ? 'pdf' : 'zip'}`
+    const fileName = match ? decodeURIComponent(match[1]) : fallback
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 2000)
+    ElMessage.success(`已生成 ${fileName}`)
+  } catch (e: any) {
+    ElMessage.error(e?.message || '单据生成失败')
+  } finally {
+    docBusy.value = ''
   }
-  ElMessage.info('该单据生成还没接入')
 }
 
 async function uploadIfreightAttachment(row: RelatedRow, field: string, options: any) {
