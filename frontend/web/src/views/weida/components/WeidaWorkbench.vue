@@ -105,7 +105,12 @@
           地方就白做了。也因此不进 `WeidaColumnConfig` 的可选字段——它是派生值，不是飞书字段，
           让人把「状态」当列挑出来一份，就会出现两个状态列。
         -->
-        <ElTableColumn v-if="hasStatus" width="110" fixed="left" label="单票状态">
+        <ElTableColumn
+          v-if="hasStatus"
+          width="110"
+          fixed="left"
+          label="单票状态"
+          :cell-class-name="alertCellClass">
           <template #default="{ row }">
             <WeidaStatusTag :status="row.single_status" />
           </template>
@@ -1065,6 +1070,19 @@ function onColDragEnd() {
 }
 
 /** 行高：只有拖过的行才设高，其余交给 ElTable 自己算。 */
+/**
+ * 有提醒的行，状态格整格闪烁（与妙搭同一套视觉）。
+ *
+ * 后端 `list` 已经算好 `item.alerts`（未收到账单 / 未确认 / 未开票 / 录入反馈 / 额外费用），
+ * 这里只负责把它变成"看得见"：critical 红闪，warning 橙闪，info 不闪。
+ */
+function alertCellClass({ row }: { row: BitableRecord }): string {
+  const list = (row as unknown as { alerts?: Array<{ severity?: string }> }).alerts || []
+  if (list.some((a) => a?.severity === 'critical')) return 'cell-alert-critical'
+  if (list.some((a) => a?.severity === 'warning')) return 'cell-alert-warning'
+  return ''
+}
+
 function rowStyle({ row }: { row: BitableRecord }): Record<string, string> {
   const h = rowHeights.value[row.record_id]
   return h ? { height: `${h}px` } : {}
@@ -1328,6 +1346,26 @@ onMounted(reload)
 
 .wb-table :deep(.el-table__row) {
   cursor: pointer;
+}
+
+/* 提醒闪烁（2026-11-23）：与妙搭同口径 —— 整格描边高频交替，红=critical，橙=warning */
+@keyframes wb-alert-flash-red {
+  0%, 100% { box-shadow: inset 0 0 0 3px hsl(0 84% 55%); background: hsl(0 84% 96%); }
+  50% { box-shadow: inset 0 0 0 3px transparent; background: transparent; }
+}
+@keyframes wb-alert-flash-amber {
+  0%, 100% { box-shadow: inset 0 0 0 3px hsl(38 92% 50%); background: hsl(38 92% 95%); }
+  50% { box-shadow: inset 0 0 0 3px transparent; background: transparent; }
+}
+.wb-table :deep(td.cell-alert-critical) {
+  animation: wb-alert-flash-red 1.15s infinite;
+}
+.wb-table :deep(td.cell-alert-warning) {
+  animation: wb-alert-flash-amber 1.15s infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wb-table :deep(td.cell-alert-critical) { animation: none; box-shadow: inset 0 0 0 3px hsl(0 84% 55%); }
+  .wb-table :deep(td.cell-alert-warning) { animation: none; box-shadow: inset 0 0 0 3px hsl(38 92% 50%); }
 }
 
 .cell-empty {
