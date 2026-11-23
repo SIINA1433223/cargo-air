@@ -101,7 +101,7 @@
     :controls="false"
     style="width: 100%" />
   <el-input
-    v-else-if="field.editable && (field.type === 'textarea' || field.type === 'json')"
+    v-else-if="field.editable && (field.type === 'textarea' || field.type === 'json' || MULTILINE_COLUMNS.has(field.column))"
     v-model="model"
     type="textarea"
     :rows="3" />
@@ -110,6 +110,13 @@
 </template>
 
 <script setup lang="ts">
+const MULTILINE_COLUMNS = new Set([
+  'pickup_info',
+  'app_remark',
+  'agent_operation_requirement',
+  'customer_core_concern',
+  'special_note',
+])
 const YES_NO_COLUMNS = new Set([
   'need_insurance',
   'need_pickup',
