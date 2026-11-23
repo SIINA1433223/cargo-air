@@ -257,6 +257,11 @@
                     :class="record.alerts[0].severity === 'critical' ? 'is-critical' : 'is-warning'">
                     !
                   </span>
+                  <!-- 客服：账单「客人未确认」在单票状态格里画黄叹号（妙搭 billStatus.alertStep） -->
+                  <span
+                    v-if="role === 'customer_service' && record.fields.bill_status?.value === '客人未确认'"
+                    class="wb-alert-dot is-warning"
+                    title="账单已发送 3 天，客人还没确认">!</span>
                   <span v-if="record.weekend_check?.pending" class="wb-weekend-dot" title="周末/节假日进仓待确认" @click.stop="openWeekend(record)">!</span>
                   <span v-if="record.flight_changed" class="wb-flight-changed">航班更新</span>
                   <span
@@ -282,7 +287,56 @@
                 <div
                   v-if="inlineEdit && inlineEdit.rowId === record.id && inlineEdit.key === column.key"
                   class="wb-inline-size">
+                  <!-- 按字段类型给控件：日期弹日期面板、单选取值弹下拉、人/客商弹选择器，
+                       别的才是文本框（妙搭 EditableCell 同一套口径） -->
+                  <a-date-picker
+                    v-if="inlineEdit.type === 'date'"
+                    :value="inlineEditValue ? dayjs(inlineEditValue) : null"
+                    size="small"
+                    style="width: 100%"
+                    @click.stop
+                    @change="(v: any) => setInlineDate(v, 'YYYY-MM-DD')" />
+                  <a-date-picker
+                    v-else-if="inlineEdit.type === 'datetime'"
+                    :value="inlineEditValue ? dayjs(inlineEditValue) : null"
+                    size="small"
+                    show-time
+                    value-format="YYYY-MM-DD HH:mm:ss"
+                    style="width: 100%"
+                    @click.stop
+                    @change="(v: any, s: string) => setInlineDate(v, 'YYYY-MM-DD HH:mm:ss', s)" />
+                  <a-select
+                    v-else-if="inlinePersonColumns.has(inlineEdit.column || '')"
+                    v-model:value="inlineEditValue"
+                    size="small"
+                    show-search
+                    allow-clear
+                    style="width: 100%"
+                    :options="staffOptions.map((p: any) => ({ label: p.name, value: p.name }))"
+                    @click.stop
+                    @change="saveInlineEdit" />
+                  <a-select
+                    v-else-if="inlineVendorColumns.has(inlineEdit.column || '')"
+                    v-model:value="inlineEditValue"
+                    size="small"
+                    show-search
+                    allow-clear
+                    style="width: 100%"
+                    :options="vendorOptions.map((v) => ({ label: v.name, value: v.name }))"
+                    @click.stop
+                    @change="saveInlineEdit" />
+                  <a-select
+                    v-else-if="(inlineEdit.options?.length || 0) > 0"
+                    v-model:value="inlineEditValue"
+                    size="small"
+                    show-search
+                    allow-clear
+                    style="width: 100%"
+                    :options="inlineEdit.options!.map((o) => ({ label: o, value: o }))"
+                    @click.stop
+                    @change="saveInlineEdit" />
                   <a-input
+                    v-else
                     v-model:value="inlineEditValue"
                     class="wb-inline-edit"
                     size="small"
@@ -2321,6 +2375,7 @@ import { useSettingsStore } from '@stores/modules/setting.store'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@stores/modules/user.store'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import dayjs from 'dayjs'
 import request from '@/utils/http'
 import { Auth } from '@/utils/auth'
 import WeidaFieldEditor from './components/FieldEditor.vue'
@@ -2335,11 +2390,12 @@ type Col = {
   type: string
   editable: boolean
   virtual?: boolean
+  options?: string[]
 }
 type TemplateColumn = { id: string; label: string; expression: string }
 type BlankColumn = { id: string; label: string }
 type DisplayCol =
-  | { key: string; label: string; kind: 'field'; column: string; type: string; virtual?: boolean }
+  | { key: string; label: string; kind: 'field'; column: string; type: string; virtual?: boolean; options?: string[] }
   | { key: string; label: string; kind: 'template'; expression: string }
   | { key: string; label: string; kind: 'blank' }
 type FieldValue = { label: string; value: any; step?: number | null }
@@ -2562,7 +2618,16 @@ type PaintRule = {
 const paintOpen = ref(false)
 const paintRules = ref<PaintRule[]>([])
 const paintDraft = ref<PaintRule[]>([])
-type InlineEdit = { rowId: number; key: string; kind: 'field' | 'template'; column?: string; expression?: string; original: string }
+type InlineEdit = {
+  rowId: number
+  key: string
+  kind: 'field' | 'template'
+  column?: string
+  expression?: string
+  original: string
+  type?: string
+  options?: string[]
+}
 const inlineCalcVolume = ref<number | null>(null)
 const inlineEdit = ref<InlineEdit | null>(null)
 const inlineEditValue = ref('')
@@ -2620,7 +2685,17 @@ const displayColumns = computed<DisplayCol[]>(() =>
         return blank ? { key, label: blank.label, kind: 'blank' } : null
       }
       const c = columnMap.value.get(key)
-      return c ? { key, label: c.label, kind: 'field', column: c.column, type: c.type, virtual: c.virtual } : null
+      return c
+        ? {
+            key,
+            label: c.label,
+            kind: 'field',
+            column: c.column,
+            type: c.type,
+            virtual: c.virtual,
+            options: c.options,
+          }
+        : null
     })
     .filter((c): c is DisplayCol => !!c)
 )
@@ -4447,10 +4522,24 @@ const INLINE_READONLY = new Set([
   'bill_status',
   'opportunity_no',
   'plan_no',
+  'master_no', // 查找引用：改的是关联订单，不能在商机行里就地写
   'create_time',
   'update_time',
   'id',
 ])
+// 人 / 客商 字段在列表里也用选择器，不是自由输入
+const inlinePersonColumns = new Set([
+  'opportunity_person_in_charge',
+  'domestic_operation',
+  'responsible_route',
+  'sales_person',
+])
+const inlineVendorColumns = new Set(['customer_name', 'supplier', 'foreign_agent_name'])
+
+function setInlineDate(value: any, format: string, text?: string) {
+  inlineEditValue.value = text !== undefined ? text : value ? value.format(format) : ''
+  void saveInlineEdit()
+}
 
 function onCellClick(row: Row, column: any) {
   const key = String(column?.property || '')
@@ -4473,6 +4562,8 @@ function onCellClick(row: Row, column: any) {
     column: c.kind === 'field' ? c.column : undefined,
     expression: c.kind === 'template' ? c.expression : undefined,
     original,
+    type: c.kind === 'field' ? c.type : undefined,
+    options: c.kind === 'field' ? c.options : undefined,
   }
   inlineEditValue.value = original
   inlineCalcVolume.value = null

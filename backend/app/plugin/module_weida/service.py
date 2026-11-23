@@ -1225,6 +1225,34 @@ BILL_STEPS = (
 )
 
 
+async def _customer_bill_alerts(
+    session: AsyncSession, opp_ids: list[int]
+) -> dict[int, str]:
+    """商机 → 它关联订单里「客人未确认」的那一档（客服单票状态格的黄叹号）。"""
+    if not opp_ids:
+        return {}
+    orders = (
+        await session.execute(
+            text(
+                "SELECT l.from_id AS opp_id, o.* FROM biz_link l "
+                "JOIN biz_order o ON o.id = l.to_id AND o.is_deleted = 0 "
+                "WHERE l.from_table = 'opportunity' AND l.to_table = 'order' "
+                "AND l.field = '订单表' AND l.from_id IN :ids"
+            ).bindparams(bindparam("ids", expanding=True)),
+            {"ids": opp_ids},
+        )
+    ).mappings().all()
+    if not orders:
+        return {}
+    statuses = await _ops_bill_status(session, orders)
+    out: dict[int, str] = {}
+    for order in orders:
+        label = statuses.get(int(order["id"]), {}).get("label")
+        if label == "客人未确认":
+            out[int(order["opp_id"])] = label
+    return out
+
+
 async def _ops_bill_status(session: AsyncSession, rows: list[Any]) -> dict[int, dict[str, Any]]:
     ids = [int(r["id"]) for r in rows]
     if not ids:
@@ -1647,6 +1675,18 @@ async def list_records(
                     item["fields"]["goods_data"] = {"label": "货物数据", "value": extra["goods_data"] or ""}
                 if "final_plan" in extra:
                     item["fields"]["final_plan"] = {"label": "最终方案", "value": extra["final_plan"] or ""}
+        if wb.role == "customer_service":
+            # 妙搭：客服那一屏不摆账单状态列，只在「单票状态」格里画黄叹号 ——
+            # 该商机挂的订单中任一张走到「客人未确认」就亮。
+            alerts = await _customer_bill_alerts(session, [int(r["id"]) for r in rows])
+            for item in items:
+                label = alerts.get(int(item["id"]))
+                if label:
+                    item["fields"]["bill_status"] = {
+                        "label": "账单状态",
+                        "value": label,
+                        "step": None,
+                    }
         if wb.role == "domestic_ops":
             bill_status = await _ops_bill_status(session, rows)
             for item in items:
