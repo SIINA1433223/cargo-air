@@ -6092,7 +6092,13 @@ function blockColumns(block: LinkBlock): Col[] {
   // 交接操作：提货车队/提货信息/提货费 只在「是否需要提货=是」时出现（妙搭 visibility）。
   // 用暂存区优先，否则把「是否需要提货」拨到「是」之后要保存才看得到这三项。
   if (block.key !== 'handover') return block.columns
-  const raw = editModel.need_pickup ?? detail.value?.fields.need_pickup?.value ?? ''
+  // 交接操作卡片改的是 orderDraft（订单暂存区），不是 editModel —— 两处都要看
+  const draft = relatedOrders.value[0] ? orderDraft[relatedOrders.value[0].id] || {} : {}
+  const raw =
+    draft.need_pickup ??
+    editModel.need_pickup ??
+    detail.value?.fields.need_pickup?.value ??
+    ''
   const pickup = String(raw).trim() === '是'
   if (pickup) return block.columns
   return block.columns.filter(
