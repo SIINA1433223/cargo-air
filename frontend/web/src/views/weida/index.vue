@@ -240,35 +240,43 @@
                   class="wb-status-cell"
                   :class="{ 'wb-alert-flashing': activeAlerts(record).some((a: any) => a.severity === 'critical') }"
                   @click="openAlerts(record)">
-                  <!-- 客服：账单「客人未确认」时状态格只画一个黄色叹号（妙搭 BillAlertBadge） -->
-                  <span
-                    v-if="role === 'customer_service' && record.fields.bill_status?.value === '客人未确认'"
-                    class="wb-bill-alert-badge"
-                    title="客人未确认：账单发出后 3 天还没收到回复">!</span>
-                  <span
-                    v-else-if="record.fields.single_status?.value"
-                    class="wb-status-pill"
-                    :class="{ 'wb-status-clickable': canClickStatus(record) }"
-                    :title="canClickStatus(record) ? '点击标记为已发送询价' : ''"
-                    :style="statusPillStyle(record.fields.single_status.value)"
-                    @click.stop="onStatusClick(record)">
-                    {{ record.fields.single_status.value }}
-                  </span>
-                  <span v-else class="cell-empty">—</span>
-                  <span v-if="record.weekend_check?.pending" class="wb-weekend-dot" title="周末/节假日进仓待确认" @click.stop="openWeekend(record)">!</span>
+                  <div class="wb-status-top">
+                    <span
+                      v-if="record.fields.single_status?.value"
+                      class="wb-status-pill"
+                      :class="{ 'wb-status-clickable': canClickStatus(record) }"
+                      :title="canClickStatus(record) ? '点击标记为已发送询价' : ''"
+                      :style="statusPillStyle(record.fields.single_status.value)"
+                      @click.stop="onStatusClick(record)">
+                      {{ record.fields.single_status.value }}
+                    </span>
+                    <span v-else class="cell-empty">—</span>
+                    <!-- 所有叹号统一靠右：账单「客人未确认」黄叹号、周末/节假日、提醒 -->
+                    <span class="wb-status-flags">
+                      <span
+                        v-if="role === 'customer_service' && record.fields.bill_status?.value === '客人未确认'"
+                        class="wb-bill-alert-badge"
+                        title="客人未确认：账单发出后 3 天还没收到回复">!</span>
+                      <span
+                        v-if="record.weekend_check?.pending"
+                        class="wb-weekend-dot"
+                        title="周末/节假日进仓待确认"
+                        @click.stop="openWeekend(record)">!</span>
+                      <!-- 正在闪红框时不再画红色叹号（重复） -->
+                      <span
+                        v-if="activeAlerts(record).length && !activeAlerts(record).some((a: any) => a.severity === 'critical')"
+                        class="wb-alert-dot"
+                        :class="activeAlerts(record)[0].severity === 'critical' ? 'is-critical' : 'is-warning'">
+                        !
+                      </span>
+                    </span>
+                  </div>
                   <span v-if="record.flight_changed" class="wb-flight-changed">航班更新</span>
                   <span
                     v-if="role !== 'pricing'"
                     class="wb-flight-status"
                     :class="record.fields.flight_status?.value ? flightStatusClass(record.fields.flight_status.value) : 'is-empty'">
                     {{ record.fields.flight_status?.value || '航班状态' }}
-                  </span>
-                  <!-- 提醒叹号放最右边空白处（不夹在状态与航班状态之间），整格可点弹「这票的提醒」 -->
-                  <span
-                    v-if="activeAlerts(record).length"
-                    class="wb-alert-dot is-right"
-                    :class="activeAlerts(record)[0].severity === 'critical' ? 'is-critical' : 'is-warning'">
-                    !
                   </span>
                 </div>
               </template>
@@ -2950,7 +2958,7 @@ function sortBy(column: string) {
 const antColumns = computed<any[]>(() => {
   const cols: any[] = [
     { title: '#', key: '__index', width: 32, align: 'center' },
-    { title: role.value === 'pricing' ? '航线状态' : '单票状态', key: '__status', width: 104, fixed: 'left' },
+    { title: role.value === 'pricing' ? '航线状态' : '单票状态', key: '__status', width: 128, fixed: 'left' },
   ]
   // 「查看」列紧挨着常驻状态列（妙搭 detailColumn 置顶），且不依赖账单状态列
   if (role.value === 'domestic_ops') {
@@ -7491,7 +7499,22 @@ onUnmounted(disconnectEvents)
   display: flex;
   flex-direction: column;
   gap: 2px;
-  align-items: flex-start;
+  align-items: stretch;
+  min-width: 0;
+}
+.wb-status-top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+.wb-status-flags {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
 }
 .wb-flight-status {
   font-size: 11px;
