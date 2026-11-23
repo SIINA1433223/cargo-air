@@ -623,7 +623,7 @@
                     <template #default>{{ display(detail.fields.export_port?.value, 'text') }}</template>
                   </el-table-column>
                   <el-table-column label="预计报关时间" min-width="160">
-                    <template #default>{{ display(detail.fields.required_door_time?.value, 'datetime') }}</template>
+                    <template #default>{{ display(detail.fields.warehouse_in_operation_time?.value, 'datetime') }}</template>
                   </el-table-column>
                 </el-table>
               </div>
@@ -1076,6 +1076,28 @@
                     accept=".xlsx,.xls,.pdf,.png,.jpg,.jpeg">
                     <el-button size="small">上传订舱单</el-button>
                   </el-upload>
+                </div>
+                <!-- 交接操作页的三个订单附件列（妙搭订单表上的附件字段） -->
+                <div v-if="block.key === 'handover'" class="wb-attach-block">
+                  <div v-for="field in ORDER_ATTACH_FIELDS" :key="field" class="wb-attach-inner">
+                    <h4>{{ field }}</h4>
+                    <div
+                      v-for="a in orderExtraAttachments[relatedOrders[0].id]?.[field] || []"
+                      :key="a.id"
+                      class="wb-attach-row">
+                      <a class="wb-attach-link" @click="downloadAttachment(a)">{{ a.file_name }}</a>
+                      <el-button
+                        link
+                        type="danger"
+                        size="small"
+                        @click="removeOrderExtraAttachment(a, relatedOrders[0].id, field)">删除</el-button>
+                    </div>
+                    <el-upload
+                      :show-file-list="false"
+                      :http-request="(opt: any) => uploadOrderExtraAttachment(relatedOrders[0].id, field, opt)">
+                      <el-button size="small">上传附件</el-button>
+                    </el-upload>
+                  </div>
                 </div>
               </div>
               <div
@@ -1926,7 +1948,11 @@
             @change="(v: number | undefined) => setColumnWidth(c.key, v)" />
           <el-tag size="small" type="info">{{ c.kind === 'field' ? c.type : c.kind === 'template' ? '拼接' : '本地列' }}</el-tag>
           <el-button v-if="c.kind === 'template'" link @click="editTemplate(c.key)">编辑</el-button>
-          <el-checkbox :model-value="frozenColumns.includes(c.key)" @change="toggleFrozen(c.key)">冻结</el-checkbox>
+          <!-- 只有国内操作台支持冻结列（妙搭 freezable:true 只开在那里） -->
+          <el-checkbox
+            v-if="role === 'domestic_ops'"
+            :model-value="frozenColumns.includes(c.key)"
+            @change="toggleFrozen(c.key)">冻结</el-checkbox>
           <el-button link :disabled="i === 0" @click="moveColumn(i, -1)">上移</el-button>
           <el-button link :disabled="i === displayColumns.length - 1" @click="moveColumn(i, 1)">下移</el-button>
           <el-button link type="danger" @click="removeColumn(i)">删除</el-button>
@@ -2357,6 +2383,7 @@ type RelatedBlock = {
   table: string
   columns: Col[]
   when_field?: string | null
+  when_fields?: string[]
   when_contains?: string | null
 }
 type LinkBlock = {
@@ -2718,9 +2745,13 @@ function sortBy(column: string) {
 
 const antColumns = computed<any[]>(() => {
   const cols: any[] = [
-    { title: '#', key: '__index', width: 52, align: 'center' },
-    { title: '单票状态', key: '__status', width: 90, fixed: 'left' },
+    { title: '#', key: '__index', width: 32, align: 'center' },
+    { title: role.value === 'pricing' ? '航线状态' : '单票状态', key: '__status', width: 104, fixed: 'left' },
   ]
+  // 「查看」列紧挨着常驻状态列（妙搭 detailColumn 置顶），且不依赖账单状态列
+  if (role.value === 'domestic_ops') {
+    cols.push({ title: '查看', key: '__view_left', width: 64, fixed: 'left', align: 'center' })
+  }
   for (const c of displayColumns.value) {
     const prop = c.kind === 'field' ? c.column : c.key
     cols.push({
@@ -2747,9 +2778,6 @@ const antColumns = computed<any[]>(() => {
         },
       }),
     })
-    if (role.value === 'domestic_ops' && c.key === 'bill_status') {
-      cols.push({ title: '查看', key: '__view_left', width: 64, fixed: 'left', align: 'center' })
-    }
   }
   if (todoFields.value.length) {
 
@@ -2763,7 +2791,8 @@ const antColumns = computed<any[]>(() => {
 function antCustomRow(record: Row) {
   return {
     style: rowTintStyle({ row: record }),
-    class: isUnread(record) ? 'wb-row-unread' : '',
+    // 未读加粗只有国内操作台配了（妙搭 rowHints.unreadBold），别的台子不加
+    class: role.value === 'domestic_ops' && isUnread(record) ? 'wb-row-unread' : '',
   }
 }
 
@@ -2880,9 +2909,14 @@ const linkBlocks = computed(() => config.value?.link_blocks ?? [])
 const relatedBlocks = computed(() => config.value?.related_blocks ?? [])
 const visibleRelatedBlocks = computed(() =>
   relatedBlocks.value.filter((rb) => {
-    if (!rb.when_field || !rb.when_contains) return true
-    const raw = editModel[rb.when_field] ?? detail.value?.fields[rb.when_field]?.value ?? ''
-    return String(raw).includes(rb.when_contains)
+    if (!rb.when_contains) return true
+    // 任一列命中（车队页：提货车队 或 二程车队 含云港先达）
+    const fields = rb.when_fields?.length ? rb.when_fields : rb.when_field ? [rb.when_field] : []
+    if (!fields.length) return true
+    return fields.some((field) => {
+      const raw = editModel[field] ?? detail.value?.fields[field]?.value ?? ''
+      return String(raw).includes(rb.when_contains as string)
+    })
   }),
 )
 const relatedData = reactive<Record<string, RelatedRow[]>>({})
@@ -3121,6 +3155,9 @@ const quoteBusy = ref<number | null>(null)
 const bookingBusy = ref<number | null>(null)
 const handoverBusy = ref<number | null>(null)
 const orderAttachments = reactive<Record<number, AttachmentItem[]>>({})
+// 交接操作页的三个附件列（相关资料 / 国内邮件 / 国外邮件），按订单挂
+const ORDER_ATTACH_FIELDS = ['相关资料', '国内邮件', '国外邮件'] as const
+const orderExtraAttachments = reactive<Record<number, Record<string, AttachmentItem[]>>>({})
 const orderSnapshots = reactive<Record<number, string>>({})
 const goodsSnapshots = reactive<Record<number, string>>({})
 const portOptions = ref<Array<{ code: string; name: string }>>([])
@@ -4241,7 +4278,18 @@ function ruleValue(row: Row, key: string): any {
 }
 
 function rowTintStyle({ row }: { row: Row }) {
-  const status = String(row.fields.single_status?.value || '')
+  // 客服那一屏整行罩色只看「是否拿到货」（妙搭 rowTint：否=未拿到货、是=已拿到货、
+  // 没填不上色）；六档单票状态只出现在状态格里，不上行底色。
+  // 国内操作 / 航线价格的整行色调走各自的状态列。
+  const status =
+    role.value === 'customer_service'
+      ? (() => {
+          const got = String(row.fields.is_goods_received?.value ?? '').trim()
+          if (got === '否') return '未拿到货'
+          if (got === '是') return '已拿到货'
+          return ''
+        })()
+      : String(row.fields.single_status?.value || '')
   const color = STATUS_TINTS[status]
   return color ? { backgroundColor: color } : {}
 }
@@ -5608,6 +5656,7 @@ async function loadRelatedOrders(opportunityId: number) {
     syncOrderSnapshots()
     for (const order of relatedOrders.value) {
       void loadOrderAttachments(order.id)
+      for (const field of ORDER_ATTACH_FIELDS) void loadOrderExtraAttachment(order.id, field)
     }
   } catch {
     relatedOrders.value = []
@@ -5917,6 +5966,54 @@ async function loadOrderAttachments(orderId: number) {
   } catch {
     orderAttachments[orderId] = []
   }
+}
+
+async function loadOrderExtraAttachment(orderId: number, field: string) {
+  if (!orderExtraAttachments[orderId]) orderExtraAttachments[orderId] = {}
+  try {
+    const res = await request<any>({
+      url: `/weida/customer_service/orders/${orderId}/attachments`,
+      method: 'get',
+      params: { field },
+    })
+    orderExtraAttachments[orderId][field] = res.data?.data?.items ?? []
+  } catch {
+    orderExtraAttachments[orderId][field] = []
+  }
+}
+
+async function uploadOrderExtraAttachment(orderId: number, field: string, options: any) {
+  const form = new FormData()
+  form.append('file', options.file)
+  form.append('field', field)
+  try {
+    await request({
+      url: `/weida/customer_service/orders/${orderId}/attachments`,
+      method: 'post',
+      data: form,
+    })
+    await loadOrderExtraAttachment(orderId, field)
+    options.onSuccess?.({})
+    ElMessage.success('已上传')
+  } catch (e: any) {
+    options.onError?.(e)
+    ElMessage.error(e?.message || '上传失败')
+  }
+}
+
+async function removeOrderExtraAttachment(a: AttachmentItem, orderId: number, field: string) {
+  try {
+    await ElMessageBox.confirm(`删除附件「${a.file_name}」？`, '删除', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    })
+  } catch {
+    return
+  }
+  await request({ url: `/weida/attachments/${a.id}`, method: 'delete' })
+  await loadOrderExtraAttachment(orderId, field)
+  ElMessage.success('已删除')
 }
 
 async function generateOrderBooking(row: RelatedRow) {

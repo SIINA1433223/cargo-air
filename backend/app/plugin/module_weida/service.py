@@ -370,6 +370,7 @@ async def get_config(
                 "label": rb.label,
                 "table": rb.table,
                 "when_field": rb.when_field,
+                "when_fields": list(rb.when_fields),
                 "when_contains": rb.when_contains,
                 "columns": [
                     {
@@ -1590,8 +1591,7 @@ async def list_records(
         )
         if scope:
             where += " AND " + scope
-        if wb.role == "pricing":
-            where += " AND send_inquiry = 1"
+        # 航线价格台不过滤「已发送询价」——妙搭看全量商机（send_inquiry 只决定最底档状态名）
 
         if wb.role == "customer_service":
             order = _default_order_sql(wb)

@@ -32,6 +32,8 @@ class RelatedBlockDef:
     columns: tuple[str, ...]
     when_field: str | None = None
     when_contains: str | None = None
+    # 任一列命中 when_contains 就显示（妙搭的「车队」页：提货车队 或 二程车队 含云港先达）
+    when_fields: tuple[str, ...] = ()
     column_labels: tuple[tuple[str, str], ...] = ()
 
 
@@ -102,34 +104,10 @@ WORKBENCHES: dict[str, WorkbenchDef] = {
         detail_sections=(
             # 与源码一致：「对客方案」这组字段是关联分区的页脚，不单独成 Tab。
             ("对客方案", ("final_plan_id", "is_goods_received", "goods_not_received_remark")),
-            (
-                "商机详情",
-                (
-                    "opportunity_no",
-                    "customer_name",
-                    "client_ref_no",
-                    "destination_port",
-                    "piece_count",
-                    "gross_weight_kg",
-                    "chargeable_weight",
-                    "volume_m3",
-                    "size_length_width_height_quantity",
-                    "packaging_form",
-                    "goods_name",
-                    "goods_special_attr",
-                    "goods_value",
-                    "customer_core_concern",
-                    "latest_quote_deadline",
-                    "source_location",
-                    "delivery_address",
-                    "transport_clause",
-                    "route_requirement",
-                    "goods_ready_time",
-                    "request_arrival_time",
-                    "send_inquiry",
-                    "send_inquiry_time",
-                ),
-            ),
+            # 妙搭源码里「商机详情」是 fields: [] 兜底组 —— 商机表上没被别处点名的字段
+            # 全部按物理列顺序铺进来（业务类型/负责航线/商机负责人/鉴定机构/备注/启运港…），
+            # 只有「对客方案」页脚字段与「确认订单」按钮被排除。
+            ("商机详情", ()),
         ),
         link_blocks=(
             LinkBlockDef(
@@ -215,6 +193,7 @@ WORKBENCHES: dict[str, WorkbenchDef] = {
                     "client_ref_no",
                     "domestic_operation",
                     "supplier",
+                    "foreign_agent_name",
                     "sales_person",
                     "customer_core_concern",
                     "need_insurance",
@@ -230,7 +209,6 @@ WORKBENCHES: dict[str, WorkbenchDef] = {
                     "latest_port_arrival_time",
                     "required_door_time",
                     "master_no",
-                    "goods_data",
                 ),
             ),
         ),
@@ -239,7 +217,8 @@ WORKBENCHES: dict[str, WorkbenchDef] = {
         role="pricing",
         name="航线价格工作台",
         description="按商机报价 · 待报价队列",
-        owner_field="responsible_route",
+        # 妙搭源码 ownerField: '' —— 航线价格看全量商机，不按登录人收窄
+        owner_field=None,
         table="biz_opportunity",
         columns=(
             "opportunity_no",
@@ -321,7 +300,7 @@ WORKBENCHES: dict[str, WorkbenchDef] = {
             (
                 "货物详情",
                 (
-                    "client_ref_no",
+                    "business_info",
                     "business_type",
                     "goods_name",
                     "goods_special_attr",
@@ -340,7 +319,6 @@ WORKBENCHES: dict[str, WorkbenchDef] = {
                     "remark",
                 ),
             ),
-            ("其余字段", ()),
         ),
     ),
     "domestic_ops": WorkbenchDef(
@@ -457,7 +435,7 @@ WORKBENCHES: dict[str, WorkbenchDef] = {
                     "fleet_volume",
                     "fleet_ratio",
                 ),
-                when_field="pickup_fleet",
+                when_fields=("pickup_fleet", "second_fleet"),
                 when_contains="云港先达",
                 column_labels=(
                     ("quantity", "车队件数"),
