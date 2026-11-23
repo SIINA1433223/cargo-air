@@ -22,7 +22,7 @@ OPTION_SOURCES = {
     "航线": "tblwxQw1CHshI9QX",
     "业务部门列表": "tblpOizn4wPNYvJB",
     "航司对照表": "tblH2eYH3OKDpwBq",
-    "PKG UNIT": "tblpjmrf1jrSydj",
+    "PKG UNIT": "tblpPjmrf1jrSydj",
 }
 PROMPT_SOURCES = {
     "委托书": "tblj5Z8qm99vuexQ",
@@ -124,7 +124,9 @@ async def sync_prompts() -> dict[str, int]:
                 customer_link = fields.get("客户")
                 customer = ""
                 if isinstance(customer_link, dict):
-                    customer = ",".join(str(x) for x in customer_link.get("link_record_ids") or [])
+                    ids = [str(x) for x in customer_link.get("link_record_ids") or []]
+                    # 只留第一个客户 id 做「客户专用」标记，其余放不下列宽
+                    customer = (ids[0] if ids else "")[:64]
                 await session.execute(
                     text(
                         "INSERT INTO weida_prompt (kind, customer, type_name, prompt) "
@@ -158,6 +160,76 @@ async def prompt_templates(kind: str) -> list[dict[str, Any]]:
                 text(
                     "SELECT type_name, customer, prompt FROM weida_prompt WHERE kind = :k "
                     "ORDER BY type_name"
+                ),
+                {"k": kind},
+            )
+        ).mappings().all()
+    return [dict(r) for r in rows]
+
+
+async def admin_ref_options(kind: str = "") -> list[dict[str, Any]]:
+    async with async_db_session() as session:
+        where = "WHERE kind = :k" if kind else ""
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT id, kind, value, code FROM weida_ref_option "
+                    + where
+                    + " ORDER BY kind, sort, id"
+                ),
+                {"k": kind},
+            )
+        ).mappings().all()
+    return [dict(r) for r in rows]
+
+
+async def save_ref_option(option_id: int | None, data: dict[str, Any]) -> int:
+    async with async_db_session() as session:
+        if option_id:
+            await session.execute(
+                text(
+                    "UPDATE weida_ref_option SET kind=:k, value=:v, code=:c WHERE id=:id"
+                ),
+                {"k": data["kind"], "v": data["value"], "c": data.get("code"), "id": option_id},
+            )
+            new_id = option_id
+        else:
+            result = await session.execute(
+                text(
+                    "INSERT INTO weida_ref_option (kind, value, code) VALUES (:k, :v, :c) "
+                    "ON DUPLICATE KEY UPDATE code=VALUES(code), id=LAST_INSERT_ID(id)"
+                ),
+                {"k": data["kind"], "v": data["value"], "c": data.get("code")},
+            )
+            new_id = int(result.lastrowid or 0)
+        await session.commit()
+    return new_id
+
+
+async def delete_ref_option(option_id: int) -> None:
+    async with async_db_session() as session:
+        await session.execute(
+            text("DELETE FROM weida_ref_option WHERE id=:id"), {"id": option_id}
+        )
+        await session.commit()
+
+
+async def save_prompt(prompt_id: int, data: dict[str, Any]) -> None:
+    async with async_db_session() as session:
+        await session.execute(
+            text("UPDATE weida_prompt SET type_name=:t, prompt=:p WHERE id=:id"),
+            {"t": data.get("type_name"), "p": data.get("prompt", ""), "id": prompt_id},
+        )
+        await session.commit()
+
+
+async def admin_prompts(kind: str = "委托书") -> list[dict[str, Any]]:
+    async with async_db_session() as session:
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT id, kind, customer, type_name, prompt FROM weida_prompt "
+                    "WHERE kind = :k ORDER BY type_name, id"
                 ),
                 {"k": kind},
             )

@@ -761,6 +761,56 @@ async def arrival_report(order_id: int) -> Any:
     )
 
 
+class RefOptionBody(BaseModel):
+    id: int | None = None
+    kind: str
+    value: str
+    code: str | None = None
+
+
+class PromptBody(BaseModel):
+    type_name: str
+    prompt: str = ""
+
+
+@WeidaRouter.get("/ref-options/admin", summary="基础资料：选项列表（可维护）")
+async def ref_options_admin(kind: Annotated[str, Query()] = "") -> Any:
+    from .option_sync import admin_ref_options
+
+    return SuccessResponse(data=await admin_ref_options(kind))
+
+
+@WeidaRouter.post("/ref-options/save", summary="基础资料：保存选项")
+async def ref_options_save(body: RefOptionBody) -> Any:
+    from .option_sync import save_ref_option
+
+    new_id = await save_ref_option(body.id, body.model_dump())
+    return SuccessResponse(data={"id": new_id}, msg="已保存")
+
+
+@WeidaRouter.delete("/ref-options/{option_id}", summary="基础资料：删除选项")
+async def ref_options_delete(option_id: int) -> Any:
+    from .option_sync import delete_ref_option
+
+    await delete_ref_option(option_id)
+    return SuccessResponse(msg="已删除")
+
+
+@WeidaRouter.get("/prompts/admin", summary="基础资料：提示词列表（可维护）")
+async def prompts_admin(kind: Annotated[str, Query()] = "委托书") -> Any:
+    from .option_sync import admin_prompts
+
+    return SuccessResponse(data=await admin_prompts(kind))
+
+
+@WeidaRouter.put("/prompts/{prompt_id}", summary="基础资料：保存提示词")
+async def prompts_save(prompt_id: int, body: PromptBody) -> Any:
+    from .option_sync import save_prompt
+
+    await save_prompt(prompt_id, body.model_dump())
+    return SuccessResponse(msg="已保存")
+
+
 @WeidaRouter.get("/ref-options", summary="基础资料：选项与编码")
 async def ref_options_route(kind: Annotated[str, Query()] = "") -> Any:
     from .option_sync import ref_options

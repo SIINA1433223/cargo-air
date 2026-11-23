@@ -166,6 +166,49 @@
         </el-table>
       </el-tab-pane>
 
+      <el-tab-pane label="操作选项 / 提示词" name="refs">
+        <div class="md-toolbar">
+          <el-select v-model="refKind" style="width: 200px" @change="loadRefOptions">
+            <el-option v-for="k in REF_KINDS" :key="k" :label="k" :value="k" />
+          </el-select>
+          <el-button @click="syncRefs" :loading="refSyncing">从飞书同步</el-button>
+          <el-button type="primary" @click="addRefOption">新增选项</el-button>
+        </div>
+        <el-table :data="refOptions" size="small" border max-height="420">
+          <el-table-column prop="kind" label="分类" width="140" />
+          <el-table-column label="选项值" min-width="220">
+            <template #default="{ row }">
+              <el-input v-model="row.value" size="small" @change="saveRefOption(row)" />
+            </template>
+          </el-table-column>
+          <el-table-column label="iFreight 编码" width="180">
+            <template #default="{ row }">
+              <el-input v-model="row.code" size="small" @change="saveRefOption(row)" />
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="80">
+            <template #default="{ row }">
+              <el-button link type="danger" @click="removeRefOption(row)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div class="md-toolbar" style="margin-top: 18px">
+          <el-select v-model="promptKind" style="width: 200px" @change="loadPrompts">
+            <el-option label="委托书识别提示词" value="委托书" />
+            <el-option label="账单识别提示词" value="账单" />
+          </el-select>
+        </div>
+        <el-table :data="prompts" size="small" border max-height="420">
+          <el-table-column prop="type_name" label="提示词类型" width="180" />
+          <el-table-column label="提示词" min-width="420">
+            <template #default="{ row }">
+              <el-input v-model="row.prompt" type="textarea" :rows="3" @change="savePrompt(row)" />
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-tab-pane>
+
       <el-tab-pane label="选项字典" name="options">
         <div class="md-toolbar">
           <el-select
@@ -288,6 +331,84 @@ import StaffAdminPanel from './StaffAdminPanel.vue'
 defineOptions({ name: 'WeidaMasterDataPanel' })
 
 const activeTab = ref('vendors')
+const REF_KINDS = ['单据类型', '揽货方式', '业务类型', '业务所属部门', '航线', '业务部门', '航空公司', '件数单位']
+const refKind = ref('单据类型')
+const refOptions = ref<Array<{ id?: number; kind: string; value: string; code?: string | null }>>([])
+const refSyncing = ref(false)
+const promptKind = ref('委托书')
+const prompts = ref<Array<{ id: number; type_name: string; prompt?: string | null }>>([])
+
+async function loadRefOptions() {
+  try {
+    const res = await request<any>({ url: '/weida/ref-options/admin', method: 'get', params: { kind: refKind.value } })
+    refOptions.value = res.data?.data ?? []
+  } catch {
+    refOptions.value = []
+  }
+}
+
+async function loadPrompts() {
+  try {
+    const res = await request<any>({ url: '/weida/prompts/admin', method: 'get', params: { kind: promptKind.value } })
+    prompts.value = res.data?.data ?? []
+  } catch {
+    prompts.value = []
+  }
+}
+
+async function syncRefs() {
+  refSyncing.value = true
+  try {
+    const res = await request<any>({ url: '/weida/ref-options/sync', method: 'post' })
+    ElMessage.success(`已同步：${JSON.stringify(res.data?.data?.options || {})}`)
+    await loadRefOptions()
+    await loadPrompts()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '同步失败')
+  } finally {
+    refSyncing.value = false
+  }
+}
+
+async function saveRefOption(row: { id?: number; kind: string; value: string; code?: string | null }) {
+  try {
+    await request({ url: '/weida/ref-options/save', method: 'post', data: row })
+    ElMessage.success('已保存')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '保存失败')
+  }
+}
+
+async function addRefOption() {
+  const row = { kind: refKind.value, value: '新选项', code: '' }
+  await saveRefOption(row)
+  await loadRefOptions()
+}
+
+async function removeRefOption(row: { id?: number }) {
+  if (!row.id) return
+  try {
+    await request({ url: `/weida/ref-options/${row.id}`, method: 'delete' })
+    ElMessage.success('已删除')
+    await loadRefOptions()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '删除失败')
+  }
+}
+
+async function savePrompt(row: { id: number; type_name: string; prompt?: string | null }) {
+  try {
+    await request({
+      url: `/weida/prompts/${row.id}`,
+      method: 'put',
+      data: { type_name: row.type_name, prompt: row.prompt || '' },
+    })
+    ElMessage.success('已保存')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '保存失败')
+  }
+}
+
 const mailStatus = ref<Array<Record<string, any>>>([])
 const mailCounts = ref<Record<string, number>>({})
 const mailLoading = ref(false)
@@ -652,6 +773,10 @@ function onTabChange(name: string | number) {
   if (name === 'mail') void loadMailStatus()
   if (name === 'automation') void loadAutomation()
   if (name === 'fleet') void loadFleet()
+  if (name === 'refs') {
+    void loadRefOptions()
+    void loadPrompts()
+  }
 }
 
 onMounted(() => {
