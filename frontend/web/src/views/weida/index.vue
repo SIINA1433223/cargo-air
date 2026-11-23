@@ -1391,7 +1391,10 @@
                   <template #default>{{ display(detail.fields.master_no?.value, 'text') }}</template>
                 </el-table-column>
                 <el-table-column label="分单号" width="140">
-                  <template #default="{ row }">{{ display(row.fields.house_bl_no?.value, 'text') }}</template>
+                  <template #default="{ row }">
+                    <el-input :model-value="row.fields.house_bl_no?.value ?? ''" size="small"
+                      @change="(v: string) => saveRelatedField(rb, row, 'house_bl_no', v)" />
+                  </template>
                 </el-table-column>
                 <el-table-column label="主单目的港" width="100">
                   <template #default>{{ display(detail.fields.destination?.value, 'text') }}</template>
@@ -1400,19 +1403,34 @@
                   <template #default>{{ display(detail.fields.destination?.value, 'text') }}</template>
                 </el-table-column>
                 <el-table-column label="件数" width="70">
-                  <template #default="{ row }">{{ display(row.fields.quantity?.value, 'number') }}</template>
+                  <template #default="{ row }">
+                    <el-input :model-value="row.fields.quantity?.value ?? ''" size="small"
+                      @change="(v: string) => saveRelatedField(rb, row, 'quantity', v)" />
+                  </template>
                 </el-table-column>
                 <el-table-column label="毛重" width="80">
-                  <template #default="{ row }">{{ display(row.fields.gross_weight?.value, 'number') }}</template>
+                  <template #default="{ row }">
+                    <el-input :model-value="row.fields.gross_weight?.value ?? ''" size="small"
+                      @change="(v: string) => saveRelatedField(rb, row, 'gross_weight', v)" />
+                  </template>
                 </el-table-column>
                 <el-table-column label="体积" width="80">
-                  <template #default="{ row }">{{ display(row.fields.volume?.value, 'number') }}</template>
+                  <template #default="{ row }">
+                    <el-input :model-value="row.fields.volume?.value ?? ''" size="small"
+                      @change="(v: string) => saveRelatedField(rb, row, 'volume', v)" />
+                  </template>
                 </el-table-column>
                 <el-table-column label="尺寸" width="200">
-                  <template #default="{ row }">{{ display(row.fields.dimension?.value, 'text') }}</template>
+                  <template #default="{ row }">
+                    <el-input :model-value="row.fields.dimension?.value ?? ''" size="small"
+                      @change="(v: string) => saveRelatedField(rb, row, 'dimension', v)" />
+                  </template>
                 </el-table-column>
                 <el-table-column label="品名" width="160">
-                  <template #default="{ row }">{{ display(row.fields.customs_declaration_goods_name?.value, 'text') }}</template>
+                  <template #default="{ row }">
+                    <el-input :model-value="row.fields.customs_declaration_goods_name?.value ?? ''" size="small"
+                      @change="(v: string) => saveRelatedField(rb, row, 'customs_declaration_goods_name', v)" />
+                  </template>
                 </el-table-column>
                 <el-table-column label="司机信息" width="160">
                   <template #default>{{ display(detail.fields.driver_info?.value, 'text') }}</template>
@@ -1454,7 +1472,10 @@
                   </template>
                 </el-table-column>
                 <el-table-column label="分单品名" width="150">
-                  <template #default="{ row }">{{ display(row.fields.goods_description?.value, 'text') }}</template>
+                  <template #default="{ row }">
+                    <el-input :model-value="row.fields.goods_description?.value ?? ''" size="small"
+                      @change="(v: string) => saveRelatedField(rb, row, 'goods_description', v)" />
+                  </template>
                 </el-table-column>
                 <template #empty>
                   <el-empty description="暂无关联记录" />
@@ -1597,7 +1618,7 @@
                   min-width="120">
                   <template #default="{ row }">
                     <el-input
-                      v-if="c.column !== 'master_no'"
+                      v-if="relatedColumnEditable(rb, c.column)"
                       :model-value="row.fields[c.column]?.value ?? ''"
                       size="small"
                       @change="(v: string) => saveRelatedField(rb, row, c.column, v)" />
@@ -5681,6 +5702,13 @@ async function removeAttachment(a: AttachmentItem) {
   } catch (e: any) {
     ElMessage.error(e?.message || '删除失败')
   }
+}
+
+function relatedColumnEditable(rb: RelatedBlock, column: string): boolean {
+  // 查找引用列只能看；车队表只放开车队体积/比例（妙搭这两列才可写）
+  if (column === 'master_no') return false
+  if (rb.key === 'fleet') return ['fleet_volume', 'fleet_ratio'].includes(column)
+  return true
 }
 
 function blockColumns(block: LinkBlock): Col[] {
