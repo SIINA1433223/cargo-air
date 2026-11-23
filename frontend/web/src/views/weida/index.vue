@@ -377,12 +377,16 @@
                 </div>
                 <div v-else-if="column.key === 'bill_status'" @click.stop>
                   <a-select
-                    :value="record.fields.bill_status?.step ?? undefined"
+                    :value="record.fields.bill_status?.step ?? '__auto'"
                     size="small"
                     allow-clear
                     placeholder="自动"
                     style="width: 170px"
                     @change="(v: any) => changeBillStatus(record, v)">
+                    <!-- 自动推导出来的那一档也要显示文字（step 为空时以前只显示空白） -->
+                    <a-select-option value="__auto">
+                      {{ record.fields.bill_status?.value || '自动' }}
+                    </a-select-option>
                     <a-select-option v-for="(label, i) in billStatusOptions" :key="i" :value="i + 1">
                       {{ label }}
                     </a-select-option>
@@ -5482,7 +5486,7 @@ async function previewAttachment(a: AttachmentItem) {
 }
 
 async function changeBillStatus(row: Row, value: any) {
-  const step = value ? Number(value) : null
+  const step = value && value !== '__auto' ? Number(value) : null
   try {
     await request({
       url: `/weida/domestic_ops/orders/${row.id}/bill-status`,
