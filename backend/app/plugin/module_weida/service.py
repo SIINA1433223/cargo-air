@@ -830,6 +830,96 @@ async def sync_approval_statuses() -> int:
     return updated
 
 
+def _fleet_volume(text_value: str) -> float | None:
+    """尺码串 → 体积（m³，三位小数），与妙搭 fleetVolume 同一口径。"""
+    groups = [g for g in __import__("re").split(r"[\s,;，；、]+", str(text_value or "")) if g.strip()]
+    if not groups:
+        return None
+    total = 0.0
+    for group in groups:
+        nums = [p for p in __import__("re").split(r"[*xX×]", group) if p != ""]
+        try:
+            values = [float(x) for x in nums]
+        except ValueError:
+            return None
+        if len(values) < 3 or len(values) > 4 or any(v <= 0 for v in values):
+            return None
+        l, w, h = values[0], values[1], values[2]
+        n = values[3] if len(values) == 4 else 1
+        total += (l / 100) * (w / 100) * (h / 100) * n
+    return round(total, 3)
+
+
+def _fleet_number(value: Any) -> float:
+    try:
+        return float(str(value).replace(",", "").strip())
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _fleet_requirement(text_value: str) -> float | None:
+    hit = __import__("re").search(r"(\d+(?:\.\d+)?)\s*[:：;；]\s*(\d+(?:\.\d+)?)", str(text_value or ""))
+    if not hit:
+        return None
+    try:
+        denom = float(hit.group(2))
+    except ValueError:
+        return None
+    return denom if denom > 0 else None
+
+
+async def fleet_infos(session: AsyncSession, orders: list[Any]) -> dict[int, dict[str, Any]]:
+    """按「对账分单号」匹配车队数据，算出车队件数/毛重/尺寸/体积/比例与两种提醒。"""
+    if not orders:
+        return {}
+    keys = {
+        int(order["id"]): str(order.get("house_bl_no") or order.get("client_ref_no") or "").strip()
+        for order in orders
+    }
+    wanted = [v for v in keys.values() if v]
+    if not wanted:
+        return {}
+    rows = (
+        await session.execute(
+            text(
+                "SELECT data FROM fleet_data WHERE data IS NOT NULL AND "
+                'JSON_UNQUOTE(JSON_EXTRACT(data, \'$."对账分单号"\')) IN :keys'
+            ).bindparams(bindparam("keys", expanding=True)),
+            {"keys": wanted},
+        )
+    ).scalars().all()
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for raw in rows:
+        try:
+            data = raw if isinstance(raw, dict) else json.loads(raw)
+        except (TypeError, ValueError):
+            continue
+        ledger = str(data.get("对账分单号") or "").strip()
+        if ledger:
+            grouped.setdefault(ledger, []).append(data)
+    out: dict[int, dict[str, Any]] = {}
+    for order_id, ledger in keys.items():
+        items = grouped.get(ledger) or []
+        if not items:
+            continue
+        counts = [_fleet_number(item.get("实际件数")) for item in items if item.get("实际件数")]
+        weights = [_fleet_number(item.get("实际毛重")) for item in items if item.get("实际毛重")]
+        sizes = [str(item.get("实际尺码") or "").strip() for item in items]
+        sizes = [x for x in sizes if x]
+        volume = _fleet_volume("\n".join(sizes)) if sizes else None
+        weight_total = sum(weights)
+        ratio = round(weight_total / volume) if volume and weight_total else None
+        out[order_id] = {
+            "count": "\n".join(str(int(c)) for c in counts),
+            "weight": "\n".join(f"{w:g}" for w in weights),
+            "size": "\n".join(sizes),
+            "volume": volume,
+            "ratio": f"1:{ratio}" if ratio else None,
+            "arrived": bool(counts or weights or sizes),
+        }
+    return out
+
+
 async def _ops_alerts(session: AsyncSession, rows: list[Any]) -> dict[int, list[dict[str, str]]]:
     ids = [int(r["id"]) for r in rows]
     if not ids:
@@ -1672,12 +1762,51 @@ async def list_records(
             _apply_supplier(item, suppliers)
         if wb.role == "domestic_ops":
             goods = await _ops_goods_data(session, [int(x["id"]) for x in items])
+            fleet_map = await fleet_infos(session, rows)
             alerts = await _ops_alerts(session, rows)
             for item in items:
                 current = item["fields"].get("goods_data", {}).get("value")
                 value = goods.get(int(item["id"])) or _normalize_goods_text(current)
                 item["fields"]["goods_data"] = {"label": "货物数据", "value": value}
-                if int(item["id"]) in alerts:
+                fleet = fleet_map.get(int(item["id"]))
+                if fleet:
+                    item["fleet"] = fleet
+                    fleet_alerts = list(item.get("alerts") or [])
+                    if fleet.get("arrived"):
+                        fleet_alerts.append(
+                            {
+                                "key": f"fleet-arrived:{item['id']}",
+                                "severity": "critical",
+                                "title": "先达已到货",
+                                "detail": "车队数据已回传（按对账分单号匹配）",
+                            }
+                        )
+                    ratio_text = str(fleet.get("ratio") or "")
+                    if ratio_text.startswith("1:") and fleet.get("volume"):
+                        try:
+                            density = _fleet_number(ratio_text.split(":", 1)[1])
+                        except (TypeError, ValueError):
+                            density = 0
+                        required = _fleet_requirement(str(item["fields"].get("level_ratio_req", {}).get("value") or ""))
+                        volume = float(fleet["volume"])
+                        weight = density * volume
+                        if density and required:
+                            heavy = weight > volume * 167
+                            violated = density < required if heavy else density > required
+                            near = not violated and abs(density - required) <= required * 0.1
+                            if violated or near:
+                                fleet_alerts.append(
+                                    {
+                                        "key": f"fleet-ratio:{item['id']}:{density}:{required}",
+                                        "severity": "warning" if near else "critical",
+                                        "title": "车队比例提醒",
+                                        "detail": f"车队比例 1:{round(density)}，要求 1:{required:g}"
+                                        + ("（相差很近）" if near else ("（重货偏低）" if heavy else "（泡货偏高）")),
+                                    }
+                                )
+                    if fleet_alerts:
+                        item["alerts"] = fleet_alerts
+                elif int(item["id"]) in alerts:
                     item["alerts"] = alerts[int(item["id"])]
         status = await _status_map(session, wb, rows)
         for item in items:
@@ -1810,7 +1939,13 @@ async def get_record(wb: WorkbenchDef, record_id: int) -> dict[str, Any] | None:
         _apply_people(item, people)
         _apply_supplier(item, suppliers)
         item = await _attach_customer_flight(wb, record_id, item)
-        return await _attach_status(wb, row, item)
+        item = await _attach_status(wb, row, item)
+        if wb.role == "domestic_ops":
+            async with async_db_session() as fleet_session:
+                fleet = await fleet_infos(fleet_session, [row])
+            if fleet.get(record_id):
+                item["fleet"] = fleet[record_id]
+        return item
     return None
 
 

@@ -307,6 +307,10 @@ async def sync_table(
             for field, column in mapping.items():
                 if field == "feishu_record_id":
                     continue
+                # JSON 表（车队计划/数据/账单/报价审核）整行收进 data 列，
+                # 不能再按字段循环覆盖成 None —— 之前就是这样把 data 写成空的。
+                if json_table and column == "data":
+                    continue
                 if column == "chargeable_weight":
                     continue
                 raw = item.get("fields", {}).get(field)

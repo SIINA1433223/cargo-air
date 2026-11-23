@@ -1380,6 +1380,33 @@
                   {{ a.file_name }}
                 </a>
               </div>
+              <!-- 车队：按「对账分单号」匹配车队数据（件数/毛重/尺码/体积/比例） -->
+              <el-table
+                v-if="rb.key === 'fleet'"
+                v-loading="relatedLoading[rb.key]"
+                :data="[detail.fleet || {}]"
+                size="small"
+                border>
+                <el-table-column label="分单号" min-width="140">
+                  <template #default>{{ (relatedData.ifreight || []).map((r: any) => r.fields.house_bl_no?.value).filter(Boolean).join(' / ') || '—' }}</template>
+                </el-table-column>
+                <el-table-column label="车队件数" width="110">
+                  <template #default>{{ (detail.fleet?.count || '').replace(/\n/g, ' / ') || '—' }}</template>
+                </el-table-column>
+                <el-table-column label="车队毛重" width="110">
+                  <template #default>{{ (detail.fleet?.weight || '').replace(/\n/g, ' / ') || '—' }}</template>
+                </el-table-column>
+                <el-table-column label="车队尺寸" min-width="160">
+                  <template #default>{{ (detail.fleet?.size || '').replace(/\n/g, ' / ') || '—' }}</template>
+                </el-table-column>
+                <el-table-column label="车队体积" width="110">
+                  <template #default>{{ detail.fleet?.volume ?? '—' }}</template>
+                </el-table-column>
+                <el-table-column label="车队比例" width="110">
+                  <template #default>{{ detail.fleet?.ratio || '—' }}</template>
+                </el-table-column>
+                <template #empty><el-empty description="车队数据还没回传（对账分单号匹配）" /></template>
+              </el-table>
               <!-- 到货预报表：照妙搭那一页的表头逐列摆（父单字段 + 逐条 iFreight），
                    与生成 Excel 的口径一致（见后端 arrival.py） -->
               <el-table
@@ -1517,7 +1544,7 @@
                 </template>
               </el-table>
               <el-table
-                v-else
+                v-else-if="rb.key !== 'fleet'"
                 v-loading="relatedLoading[rb.key]"
                 :data="relatedData[rb.key] || []"
                 size="small"
@@ -2537,6 +2564,7 @@ type FieldValue = { label: string; value: any; step?: number | null }
 type Row = {
   id: number
   is_new?: boolean
+  fleet?: { count?: string; weight?: string; size?: string; volume?: number | null; ratio?: string | null; arrived?: boolean }
   fields: Record<string, FieldValue>
   handover?: { to_name?: string; end_at?: string; can_cancel?: boolean }
   weekend_check?: { pending: boolean; items: Record<string, boolean> }
