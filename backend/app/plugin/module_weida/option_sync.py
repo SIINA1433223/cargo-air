@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from sqlalchemy import text
@@ -91,6 +92,21 @@ async def sync_options() -> dict[str, int]:
         if code or name:
             # 用户 2026-11-24：航空公司选项是两位代码（QF、M7…），不是全名
             rows.append(("航空公司", code or name, code or None, sort))
+    # 车队（提货车队/二程车队）：直接取订单表这两个单选字段的选项
+    order_fields = (
+        await asyncio.to_thread(
+            fs.req,
+            f"{fs.API}/bitable/v1/apps/{fs.MAIN}/tables/tblqNRxcBz4HRbY6/fields?page_size=200",
+            token,
+        )
+    )["data"]["items"]
+    for field in order_fields:
+        if field["field_name"] not in ("提货车队", "二程车队"):
+            continue
+        for option in (field.get("property") or {}).get("options") or []:
+            name = _text(option.get("name"))
+            if name:
+                rows.append(("车队", name, None, sort))
     for item in fs.records(token, fs.MAIN, OPTION_SOURCES["PKG UNIT"]):
         fields = item.get("fields", {})
         code = _text(fields.get("Code"))

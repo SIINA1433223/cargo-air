@@ -477,6 +477,23 @@
                   <el-option v-for="v in vendorOptions" :key="v.id" :label="v.name" :value="v.name" />
                 </el-select>
                 <el-select
+                  v-else-if="item.column === 'destination_port'"
+                  v-model="editModel[item.column]"
+                  multiple
+                  collapse-tags
+                  filterable
+                  remote
+                  :remote-method="searchPortOptions"
+                  :loading="portOptionsLoading"
+                  clearable
+                  placeholder="输入三字代码（如 CDG）">
+                  <el-option
+                    v-for="p in portOptions"
+                    :key="`${p.code}-${p.name}`"
+                    :label="`${p.code} ${p.name}`"
+                    :value="p.code" />
+                </el-select>
+                <el-select
                   v-else-if="isCreateSelect(item.column)"
                   v-model="editModel[item.column]"
                   :multiple="item.column === 'destination_port'"
@@ -620,6 +637,21 @@
                     clearable
                     placeholder="请选择客户">
                     <el-option v-for="v in vendorOptions" :key="v.id" :label="v.name" :value="v.name" />
+                  </el-select>
+                  <el-select
+                    v-else-if="f.column === 'departure_location' || f.column === 'destination'"
+                    v-model="editModel[f.column]"
+                    filterable
+                    remote
+                    :remote-method="searchPortOptions"
+                    :loading="portOptionsLoading"
+                    clearable
+                    placeholder="输入三字代码（如 CDG）">
+                    <el-option
+                      v-for="p in portOptions"
+                      :key="`${p.code}-${p.name}`"
+                      :label="`${p.code} ${p.name}`"
+                      :value="p.code" />
                   </el-select>
                   <el-select
                     v-else-if="f.column === 'destination_port'"
@@ -3721,13 +3753,8 @@ async function loadFieldOptions() {
     columns.map(async (column) => {
       try {
         if (column === 'destination_port') {
-          // 目的港一次性取全量（约 5700 个三字码），新建/筛选直接可选
-          const ports = await request<any>({
-            url: '/weida/port-options',
-            method: 'get',
-            params: { limit: 7000 },
-          })
-          fieldOptions.destination_port = ports.data?.data ?? []
+          // 港口一律远程按三字代码搜（铁律），不预载全量避免客户端模糊匹配出杂项
+          fieldOptions.destination_port = []
           return
         }
         const res = await request<any>({

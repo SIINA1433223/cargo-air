@@ -446,6 +446,7 @@ async def get_config(
         "biz_order": {
             "transport_clause", "customs_declaration_method", "cost_currency",
             "flight_status", "goods_name_special_attr", "goods_special_attr",
+            "pickup_fleet", "second_fleet",
             "exception_status", "leader_review_status", "operation_single_status",
         },
         "biz_ifreight": {
@@ -458,6 +459,18 @@ async def get_config(
             "cost_currency", "quotation_status", "cabin_status",
         },
     }.get(wb.table, set())
+    # 车队（提货车队/二程车队）的选项以「基础资料」里的车队清单为准
+    if wb.table == "biz_order":
+        try:
+            from .option_sync import ref_options
+
+            fleet_values = [row["value"] for row in await ref_options("车队")]
+            if fleet_values:
+                for col in columns + detail_fields:
+                    if col.get("column") in ("pickup_fleet", "second_fleet"):
+                        col["options"] = fleet_values
+        except Exception:
+            pass
     if option_fields:
         try:
             async with async_db_session() as opt_session:
@@ -2305,6 +2318,8 @@ OPTION_COLUMNS = {
     ("biz_ifreight", "freight_payment_method"),
     ("biz_ifreight", "surcharge_payment_method"),
     ("biz_ifreight", "piece_unit"),
+    ("biz_order", "pickup_fleet"),
+    ("biz_order", "second_fleet"),
 }
 
 
@@ -2316,6 +2331,8 @@ REF_OPTION_KINDS = {
     ("biz_ifreight", "route"): "航线",
     ("biz_ifreight", "airline_company"): "航空公司",
     ("biz_ifreight", "piece_unit"): "件数单位",
+    ("biz_order", "pickup_fleet"): "车队",
+    ("biz_order", "second_fleet"): "车队",
 }
 
 
@@ -2386,14 +2403,12 @@ async def list_port_options(keyword: str | None = None, limit: int = 6000) -> li
     where = "active = 1 AND city_code IS NOT NULL AND city_code <> ''"
     params: dict[str, Any] = {"limit": limit}
     if keyword:
-        kw = keyword.strip()
-        if len(kw) <= 3:
-            where += " AND (city_code = :kw OR city_code LIKE :kw2)"
-            params["kw"] = kw.upper()
-            params["kw2"] = f"{kw.upper()}%"
-        else:
-            where += " AND (city_code LIKE :kw OR city_name LIKE :kw)"
-            params["kw"] = f"%{kw.upper()}%"
+        # 铁律：港口一律按**三字代码**匹配。输入 CDG 只给 CDG（或 CDG 开头的代码），
+        # 绝不按城市名模糊出一串不相干的值。
+        kw = keyword.strip().upper()
+        where += " AND (city_code = :kw OR city_code LIKE :kw2)"
+        params["kw"] = kw
+        params["kw2"] = f"{kw}%"
     async with async_db_session() as session:
         rows = (
             await session.execute(
