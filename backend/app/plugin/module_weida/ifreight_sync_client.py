@@ -171,17 +171,22 @@ def build_body(order: dict[str, Any], row: dict[str, Any], maps: dict[str, dict[
         if text_value:
             body[key] = text_value
 
-    put("PrcpName", row.get("client_name"))
-    put("PrcpAddr", row.get("client_address"))
-    put("BkgAgtName", row.get("booking_agent") or row.get("booking_agent_name"))
-    put("ShprName", row.get("shipper_name"))
-    put("ShprAddr", row.get("shipper_address"))
-    put("CneeName", row.get("consignee_name"))
-    put("CneeAddr", row.get("consignee_address"))
+    # iFreight 的地址列上限 300（ORA-12899 实测），超了整单同步会失败 —— 按 300 截断
+    def clip(text_value: Any, limit: int = 300) -> str:
+        raw = _text(text_value)
+        return raw[:limit]
+
+    put("PrcpName", clip(row.get("client_name")))
+    put("PrcpAddr", clip(row.get("client_address")))
+    put("BkgAgtName", clip(row.get("booking_agent") or row.get("booking_agent_name")))
+    put("ShprName", clip(row.get("shipper_name")))
+    put("ShprAddr", clip(row.get("shipper_address")))
+    put("CneeName", clip(row.get("consignee_name")))
+    put("CneeAddr", clip(row.get("consignee_address")))
     body["CneeCode"] = DEFAULT_CNEE_CODE
     body["NotyCode"] = _text(row.get("notify_party_code")) or DEFAULT_NOTY_CODE
-    put("NotyName", row.get("notify_party_name"))
-    put("NotyAddr", row.get("notify_party_address"))
+    put("NotyName", clip(row.get("notify_party_name")))
+    put("NotyAddr", clip(row.get("notify_party_address")))
     put("AgtName", row.get("foreign_agent"))
     put("POLCityCode", _text(row.get("origin_city_code")).upper() or None)
     put("PODCityCode", _text(row.get("dest_city_code")).upper() or None)
