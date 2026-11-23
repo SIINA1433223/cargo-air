@@ -240,8 +240,13 @@
                   class="wb-status-cell"
                   :class="{ 'wb-alert-flashing': activeAlerts(record).some((a: any) => a.severity === 'critical') }"
                   @click="openAlerts(record)">
+                  <!-- 客服：账单「客人未确认」时状态格只画一个黄色叹号（妙搭 BillAlertBadge） -->
                   <span
-                    v-if="record.fields.single_status?.value"
+                    v-if="role === 'customer_service' && record.fields.bill_status?.value === '客人未确认'"
+                    class="wb-bill-alert-badge"
+                    title="客人未确认：账单发出后 3 天还没收到回复">!</span>
+                  <span
+                    v-else-if="record.fields.single_status?.value"
                     class="wb-status-pill"
                     :class="{ 'wb-status-clickable': canClickStatus(record) }"
                     :title="canClickStatus(record) ? '点击标记为已发送询价' : ''"
@@ -257,11 +262,6 @@
                     :class="activeAlerts(record)[0].severity === 'critical' ? 'is-critical' : 'is-warning'">
                     !
                   </span>
-                  <!-- 客服：账单「客人未确认」在单票状态格里画黄叹号（妙搭 billStatus.alertStep） -->
-                  <span
-                    v-if="role === 'customer_service' && record.fields.bill_status?.value === '客人未确认'"
-                    class="wb-alert-dot is-warning"
-                    title="账单已发送 3 天，客人还没确认">!</span>
                   <span v-if="record.weekend_check?.pending" class="wb-weekend-dot" title="周末/节假日进仓待确认" @click.stop="openWeekend(record)">!</span>
                   <span v-if="record.flight_changed" class="wb-flight-changed">航班更新</span>
                   <span
@@ -7640,6 +7640,20 @@ onUnmounted(disconnectEvents)
 }
 .wb-form-compact :deep(.el-form-item:has(textarea)) {
   grid-column: span 2;
+}
+.wb-bill-alert-badge {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(212, 160, 23, 0.55);
+  background: rgba(212, 160, 23, 0.16);
+  color: #b07d0a;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
 }
 .wb-status-clickable {
   cursor: pointer;
