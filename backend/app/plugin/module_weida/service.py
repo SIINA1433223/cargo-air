@@ -1964,6 +1964,68 @@ async def _ensure_order(session: AsyncSession, opp: Any) -> int | None:
     return order_id
 
 
+# 商机（客服台）与订单（操作台）共用的字段：一边改了，另一边同秒跟着变。
+# 列名不一样的两对：起运地 departure_port ↔ departure_location、目的地 destination_port ↔ destination。
+SHARED_FIELDS: tuple[tuple[str, str], ...] = (
+    ("client_ref_no", "client_ref_no"),
+    ("customer_name", "customer_name"),
+    ("foreign_agent_name", "foreign_agent_name"),
+    ("goods_name_special_attr", "goods_name_special_attr"),
+    ("goods_data", "goods_data"),
+    ("goods_special_attr", "goods_special_attr"),
+    ("customer_core_concern", "customer_core_concern"),
+    ("transport_clause", "transport_clause"),
+    ("goods_ready_time", "goods_ready_time"),
+    ("request_arrival_time", "request_arrival_time"),
+    ("departure_port", "departure_location"),
+    ("destination_port", "destination"),
+)
+
+
+async def _propagate_shared(
+    session: AsyncSession, table: str, record_id: int, payload: dict[str, Any]
+) -> list[tuple[str, int, list[str]]]:
+    """把改动同步到对端表（商机↔订单），返回 [(目标表, 记录id, 变更列)] 供发事件。"""
+    if table == "biz_opportunity":
+        target = "biz_order"
+        column_map = {a: b for a, b in SHARED_FIELDS}
+        link_sql = (
+            "SELECT to_id FROM biz_link WHERE from_table='opportunity' "
+            "AND to_table='order' AND field='订单表' AND from_id=:id"
+        )
+    elif table == "biz_order":
+        target = "biz_opportunity"
+        column_map = {b: a for a, b in SHARED_FIELDS}
+        link_sql = (
+            "SELECT from_id FROM biz_link WHERE from_table='opportunity' "
+            "AND to_table='order' AND field='订单表' AND to_id=:id"
+        )
+    else:
+        return []
+    ids = [
+        int(r[0]) for r in (await session.execute(text(link_sql), {"id": record_id})).all()
+    ]
+    if not ids:
+        return []
+    sets: list[str] = []
+    params: dict[str, Any] = {}
+    for col, value in payload.items():
+        target_col = column_map.get(col)
+        if not target_col:
+            continue
+        sets.append(f"`{target_col}` = :{target_col}")
+        params[target_col] = value
+    if not sets:
+        return []
+    await session.execute(
+        text(
+            f"UPDATE `{target}` SET {', '.join(sets)}, update_time = NOW(3) "
+            "WHERE id IN :ids AND is_deleted = 0"
+        ).bindparams(bindparam("ids", expanding=True)),
+        {**params, "ids": ids},
+    )
+    return [(target, rid, list(params)) for rid in ids]
+
 async def update_record(
     wb: WorkbenchDef,
     record_id: int,
@@ -2030,6 +2092,8 @@ async def update_record(
             ).mappings().first()
             if current and current.get("is_goods_received") == "是":
                 await _ensure_order(session, current)
+        # 商机 ↔ 订单 共用字段：一边改了，对端同一次提交里跟着改（秒级生效）
+        shared_hits = await _propagate_shared(session, wb.table, record_id, payload)
         await session.commit()
         await run_automations(wb.table, record_id, payload, actor)
     await publish_event(
@@ -2038,6 +2102,10 @@ async def update_record(
         fields=sorted(payload),
         actor=actor,
     )
+    for target_table, target_id, changed in shared_hits:
+        await publish_event(
+            table=target_table, record_id=target_id, fields=changed, actor=actor
+        )
     return await get_record(wb, record_id)
 
 

@@ -6939,10 +6939,13 @@ function stopPolling() {
 }
 
 function startPolling() {
-  if (pollTimer !== null || isDashboard.value || role.value === 'domestic_ops') return
+  if (pollTimer !== null || isDashboard.value) return
+  // 三个工作台共用同一批字段（商机↔订单），一边改了另一边要秒级看到：
+  // 客服/航线 5 秒，国内操作 8 秒（整表不翻页，稍慢一点）
+  const interval = role.value === 'domestic_ops' ? 8000 : 5000
   pollTimer = window.setInterval(() => {
-    if (document.visibilityState === 'visible' && !loading.value) load(true)
-  }, 15000)
+    if (document.visibilityState === 'visible' && !loading.value && !saving.value) load(true)
+  }, interval)
 }
 
 function fieldType(column: string): string {
