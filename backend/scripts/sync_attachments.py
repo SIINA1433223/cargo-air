@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 import sys
@@ -34,9 +35,17 @@ OWNER_KEYS = {
 TARGETS = ["biz_order", "biz_ifreight", "biz_plan", "biz_pricing"]
 
 
-def _download(token: str, table_id: str, file_token: str) -> bytes:
+def _download(token: str, table_id: str, field_id: str, record_id: str, file_token: str) -> bytes:
+    # 与 Java 引擎一致：bitablePerm 里要带 字段→记录→token 的授权结构
     extra = base64.b64encode(
-        json.dumps({"bitablePerm": {"tableId": table_id}}).encode()
+        json.dumps(
+            {
+                "bitablePerm": {
+                    "tableId": table_id,
+                    "attachments": {field_id: {record_id: [file_token]}},
+                }
+            }
+        ).encode()
     ).decode()
     url = (
         f"{fs.API}/drive/v1/medias/{urllib.parse.quote(file_token)}/download"
@@ -68,6 +77,16 @@ async def run(apply: bool) -> None:
             continue
         owner = OWNER_KEYS[local]
         items = fs.records(token, fs.MAIN, table_id)
+        field_ids = {
+            f["field_name"]: f["field_id"]
+            for f in (
+                await asyncio.to_thread(
+                    fs.req,
+                    f"{fs.API}/bitable/v1/apps/{fs.MAIN}/tables/{table_id}/fields?page_size=100",
+                    token,
+                )
+            )["data"]["items"]
+        }
         async with async_db_session() as session:
             id_map = {
                 str(row[0]): int(row[1])
@@ -100,7 +119,13 @@ async def run(apply: bool) -> None:
                     if not apply:
                         continue
                     try:
-                        data = _download(token, table_id, file_token)
+                        data = _download(
+                            token,
+                            table_id,
+                            field_ids.get(field, ""),
+                            str(item.get("record_id") or ""),
+                            file_token,
+                        )
                     except Exception as exc:  # 单个失败不影响整体
                         print(f"    下载失败：{type(exc).__name__} {exc}"[:200])
                         continue

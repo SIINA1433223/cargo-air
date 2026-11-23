@@ -89,7 +89,8 @@ async def sync_options() -> dict[str, int]:
         code = _text(fields.get("航空公司代码"))
         name = _text(fields.get("航空公司名称"))
         if code or name:
-            rows.append(("航空公司", name or code, code or None, sort))
+            # 用户 2026-11-24：航空公司选项是两位代码（QF、M7…），不是全名
+            rows.append(("航空公司", code or name, code or None, sort))
     for item in fs.records(token, fs.MAIN, OPTION_SOURCES["PKG UNIT"]):
         fields = item.get("fields", {})
         code = _text(fields.get("Code"))

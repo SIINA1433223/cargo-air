@@ -4523,8 +4523,11 @@ async function loadStaffOptions() {
 
 function applyDefaultResponsible() {
   const current = config.value?.current_staff
-  if (current?.suda_user_id && !editModel.opportunity_person_in_charge) {
-    editModel.opportunity_person_in_charge = `(${current.suda_user_id})`
+  if (current && !editModel.opportunity_person_in_charge) {
+    // 有妙搭 id 用 id 形式；没有就是本地账号 → 用姓名（人员下拉按名字）
+    editModel.opportunity_person_in_charge = current.suda_user_id
+      ? `(${current.suda_user_id})`
+      : current.name || ''
   }
   if (editModel.responsible_route) return
   const wanted = ['kevin', 'fairy']

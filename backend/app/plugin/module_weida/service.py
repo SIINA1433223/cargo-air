@@ -258,6 +258,17 @@ async def get_config(
                     {"uid": viewer_user_id},
                 )
             ).mappings().first()
+            if not current_staff:
+                # 没在 weida_user_map 里绑定时，至少把登录账号姓名带出来
+                # （客服新建商机的「商机负责人」默认用它）
+                name_row = (
+                    await session.execute(
+                        text("SELECT name FROM sys_user WHERE id = :id"),
+                        {"id": viewer_user_id},
+                    )
+                ).scalar()
+                if name_row:
+                    current_staff = {"id": None, "name": name_row, "role": None, "roles": None, "suda_user_id": None}
     available = set(meta)
     editable = editable_columns(wb, available)
     columns = build_columns(wb, meta, labels, editable)
