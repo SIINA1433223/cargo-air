@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Path, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 from redis.asyncio.client import Redis
 
@@ -34,9 +34,23 @@ from .schema import (
 )
 from .service import FeishuBitableService, _content_disposition
 
+
 # 注意：容器前缀 ``/feishu`` 已由 discover 按 module_feishu 自动挂载，
 # 此处不再声明 prefix，避免重复（否则变成 /feishu/feishu/...）。
-FeishuRouter = APIRouter(route_class=OperationLogRoute, tags=["飞书多维表格"])
+async def _deny_feishu_write(request: Request) -> None:
+    """Fast 系统只以本地 MySQL 为准，禁止任何飞书写回。"""
+    if request.method not in ("GET", "HEAD", "OPTIONS"):
+        raise HTTPException(
+            status_code=403,
+            detail="Fast 系统已关闭飞书写回，业务数据只保存到本地数据库",
+        )
+
+
+FeishuRouter = APIRouter(
+    route_class=OperationLogRoute,
+    tags=["飞书多维表格"],
+    dependencies=[Depends(_deny_feishu_write)],
+)
 
 _QUERY = ["module_feishu:record:query"]
 _DETAIL = ["module_feishu:record:detail"]

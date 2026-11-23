@@ -31,6 +31,7 @@
 <script setup lang="ts">
   import { computed, onMounted, ref, watch } from 'vue'
   import { useRoute } from 'vue-router'
+  import { COLUMNS } from './columns'
   import request from '@/utils/http'
 
   defineOptions({ name: 'WeidaWorkbench' })
@@ -77,10 +78,23 @@
 
   const columns = computed(() => {
     const sample = rows.value[0]?.fields || {}
-    return Object.keys(sample)
-      .filter((k) => k !== 'feishu_record_id')
-      .slice(0, 12)
-      .map((k) => ({ col: k, label: sample[k].label || k }))
+    const wanted = COLUMNS[role.value] || []
+    const out: Array<{ col: string; label: string }> = []
+    // 列名比较**去掉所有空格**再比：妙搭里有「目的 港」这种带空格的写法
+    const norm = (s: string) => String(s || '').replace(/\s+/g, '')
+    for (const label of wanted) {
+      const target = norm(label)
+      const key = Object.keys(sample).find((k) => norm(sample[k]?.label || k) === target)
+      if (key) out.push({ col: key, label: sample[key]?.label || label })
+    }
+    // 配置里点名的列一个都没匹配上时，退回前 12 个字段，避免整屏空白
+    if (out.length === 0) {
+      return Object.keys(sample)
+        .filter((k) => k !== 'feishu_record_id')
+        .slice(0, 12)
+        .map((k) => ({ col: k, label: sample[k].label || k }))
+    }
+    return out
   })
 
   function show(v: any): string {
