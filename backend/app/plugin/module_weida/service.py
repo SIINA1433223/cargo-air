@@ -334,6 +334,30 @@ async def get_config(
             override = label_overrides.get((section["label"], f["column"]))
             if override:
                 f["label"] = override
+    # 车队（提货车队/二程车队）的选项以「基础资料」里的车队清单为准
+    if wb.table == "biz_order":
+        try:
+            from .option_sync import ref_options
+
+            fleet_values = [row["value"] for row in await ref_options("车队")]
+            if fleet_values:
+                for col in columns + detail_fields:
+                    if col.get("column") in ("pickup_fleet", "second_fleet"):
+                        col["options"] = fleet_values
+        except Exception:
+            pass
+    # detail_sections 里的字段是独立副本：把下拉选项（如车队）一起补进去，
+    # 否则抽屉里那几个字段拿不到 options，又退回输入框
+    option_map = {
+        col["column"]: col.get("options")
+        for col in columns + detail_fields
+        if col.get("options")
+    }
+    for section in ordered_sections:
+        for field_item in section["fields"]:
+            options = option_map.get(field_item["column"])
+            if options:
+                field_item["options"] = options
     payload = {
         "role": wb.role,
         "current_staff": dict(current_staff) if current_staff else None,
@@ -459,18 +483,6 @@ async def get_config(
             "cost_currency", "quotation_status", "cabin_status",
         },
     }.get(wb.table, set())
-    # 车队（提货车队/二程车队）的选项以「基础资料」里的车队清单为准
-    if wb.table == "biz_order":
-        try:
-            from .option_sync import ref_options
-
-            fleet_values = [row["value"] for row in await ref_options("车队")]
-            if fleet_values:
-                for col in columns + detail_fields:
-                    if col.get("column") in ("pickup_fleet", "second_fleet"):
-                        col["options"] = fleet_values
-        except Exception:
-            pass
     if option_fields:
         try:
             async with async_db_session() as opt_session:
@@ -6568,7 +6580,9 @@ async def create_order_ifreight(order_id: int) -> dict[str, Any]:
                 "foreign_agent": order.get("foreign_agent_name"),
                 "sales_person": order.get("sales_person"),
                 "opportunity_person": opp_person,
-                **_parse_goods_data(order.get("goods_data")),
+                # 解析不出来时补默认值，否则缺 bind 参数整条创建失败
+                **{"quantity": None, "gross_weight": None, "volume": None, "dimension": None},
+                **_parse_goods_data(order.get("goods_data") or ""),
             },
         )
         new_id = int(result.lastrowid)
