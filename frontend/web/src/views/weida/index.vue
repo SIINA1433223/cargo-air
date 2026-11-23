@@ -236,7 +236,10 @@
               <div class="wb-cell-clip">
               <template v-if="column.key === '__index'">{{ index + 1 }}</template>
               <template v-else-if="column.key === '__status'">
-                <div class="wb-status-cell" :class="{ 'wb-alert-flashing': record.alerts?.some((a: any) => a.severity === 'critical') }">
+                <div
+                  class="wb-status-cell"
+                  :class="{ 'wb-alert-flashing': record.alerts?.some((a: any) => a.severity === 'critical') }"
+                  @click="openAlertId = record.alerts?.length ? record.id : null">
                   <span
                     v-if="record.fields.single_status?.value"
                     class="wb-status-pill"
@@ -247,11 +250,18 @@
                     {{ record.fields.single_status.value }}
                   </span>
                   <span v-else class="cell-empty">—</span>
-                  <el-popover v-if="record.alerts?.length" placement="bottom-start" :width="340" trigger="click">
+                  <!-- 整格可点：点状态格任意处都弹提醒（与妙搭一致）；红色叹号保留但只是标记 -->
+                  <el-popover
+                    v-if="record.alerts?.length"
+                    placement="bottom-start"
+                    :width="340"
+                    :visible="openAlertId === record.id"
+                    @update:visible="(v: boolean) => (openAlertId = v ? record.id : null)">
                     <template #reference>
                       <span
                         class="wb-alert-dot"
-                        :class="record.alerts[0].severity === 'critical' ? 'is-critical' : 'is-warning'">
+                        :class="record.alerts[0].severity === 'critical' ? 'is-critical' : 'is-warning'"
+                        @click.stop="openAlertId = openAlertId === record.id ? null : record.id">
                         !
                       </span>
                     </template>
@@ -2693,6 +2703,7 @@ const TODO_LABELS: Record<string, string> = {
   issue_operation_plan: '出操作计划',
   send_forecast: '发送预报',
 }
+const openAlertId = ref<number | null>(null)
 const todoFields = computed(() => config.value?.todo_checkboxes ?? [])
 const linkBlocks = computed(() => config.value?.link_blocks ?? [])
 const relatedBlocks = computed(() => config.value?.related_blocks ?? [])
