@@ -955,7 +955,14 @@ async def _ops_alerts(session: AsyncSession, rows: list[Any]) -> dict[int, list[
         sent = _ms(row.get("bill_sent_time"))
         confirm = _ms(row.get("bill_confirm_time"))
         if confirm is not None:
-            pass
+            # 正向态：确认了就留一条 info 历史，不再闪（与妙搭同一口径）
+            alerts.append(
+                {
+                    "severity": "info",
+                    "title": "客人已确认账单",
+                    "detail": "账单已确认",
+                }
+            )
         elif sent is not None and now_ms - sent >= day:
             alerts.append(
                 {
@@ -967,7 +974,14 @@ async def _ops_alerts(session: AsyncSession, rows: list[Any]) -> dict[int, list[
         ticked = row.get("invoice_issuance") in (1, True, "1")
         invoice_time = _ms(row.get("invoice_time"))
         if oid in invoice_ok:
-            pass
+            # 正向态：发票附件到了 → info 历史，不再闪
+            alerts.append(
+                {
+                    "severity": "info",
+                    "title": "财务已开票",
+                    "detail": "发票附件已回传",
+                }
+            )
         elif ticked and (invoice_time is None or now_ms >= invoice_time + day):
             alerts.append(
                 {
@@ -989,6 +1003,10 @@ async def _ops_alerts(session: AsyncSession, rows: list[Any]) -> dict[int, list[
         alerts.extend(freight_feedback.get(oid, []))
         alerts.extend(fee_alerts.get(oid, []))
         if alerts:
+            # 「点掉不闪」按数据签名记：数据一变签名就变，提醒自己回来。
+            for a in alerts:
+                a.setdefault("key", a["title"])
+                a.setdefault("signature", f'{a["title"]}|{a.get("detail", "")}')
             alerts.sort(key=lambda a: 0 if a["severity"] == "critical" else 1)
             out[oid] = alerts
     return out

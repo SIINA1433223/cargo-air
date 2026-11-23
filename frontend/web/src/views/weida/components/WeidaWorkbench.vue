@@ -76,7 +76,8 @@
         size="small"
         row-key="record_id"
         :row-style="rowStyle"
-        :cell-style="cellStyle">
+        :cell-style="cellStyle"
+        @cell-click="onStatusCellClick">
         <!--
           行高把手列：贴在最左，不显示表头、不参与列拖序。
           单独占一列是因为「拖行高」需要一个不在文本里的抓手，直接拖单元格边框会和
@@ -246,6 +247,32 @@
         :page-sizes="[20, 50, 100]"
         @size-change="pageIndex = 1" />
     </ElCard>
+
+    <ElDialog v-model="alertDialogVisible" title="这票的提醒" width="480px">
+      <div v-if="alertDialogRow" class="wb-alerts">
+        <div
+          v-for="(a, i) in alertsOf(alertDialogRow)"
+          :key="i"
+          class="wb-alert-item"
+          :class="a.severity">
+          <div class="wb-alert-head">
+            <span class="wb-alert-title">{{ a.title }}</span>
+            <span class="wb-alert-badge">{{
+              a.severity === 'critical' ? '失败/待处理' : a.severity === 'warning' ? '待处理' : '已完成'
+            }}</span>
+          </div>
+          <div class="wb-alert-detail">{{ a.detail }}</div>
+          <ElButton
+            v-if="!isDismissed(alertDialogRow, a)"
+            size="small"
+            text
+            @click="dismissAlert(alertDialogRow, a)">
+            取消提醒（数据再变会回来）
+          </ElButton>
+          <span v-else class="wb-alert-done">已取消</span>
+        </div>
+      </div>
+    </ElDialog>
 
     <!--
       `link-blocks`：详情页要**单独成一个子详情**的关联字段。商机上挂着的航线报价 /
@@ -1076,8 +1103,47 @@ function onColDragEnd() {
  * 后端 `list` 已经算好 `item.alerts`（未收到账单 / 未确认 / 未开票 / 录入反馈 / 额外费用），
  * 这里只负责把它变成"看得见"：critical 红闪，warning 橙闪，info 不闪。
  */
+type WbAlert = { key?: string; signature?: string; severity?: string; title?: string; detail?: string }
+
+function alertsOf(row: BitableRecord): WbAlert[] {
+  return (row as unknown as { alerts?: WbAlert[] }).alerts || []
+}
+
+const DISMISS_PREFIX = 'weida_alert_dismiss:'
+function dismissKeyOf(row: BitableRecord, a: WbAlert): string {
+  const id = (row as unknown as { record_id?: string }).record_id || ''
+  return `${DISMISS_PREFIX}${id}:${a.key ?? a.title ?? ''}`
+}
+/** 点掉过的（签名一致才算点掉；数据一变签名变，提醒自己回来）。 */
+function isDismissed(row: BitableRecord, a: WbAlert): boolean {
+  try {
+    return localStorage.getItem(dismissKeyOf(row, a)) === (a.signature ?? '')
+  } catch {
+    return false
+  }
+}
+
+const alertDialogVisible = ref(false)
+const alertDialogRow = ref<BitableRecord | null>(null)
+
+function onStatusCellClick(row: BitableRecord, column: { label?: string }): void {
+  if (column?.label !== '单票状态') return
+  if (alertsOf(row).length === 0) return
+  alertDialogRow.value = row
+  alertDialogVisible.value = true
+}
+
+function dismissAlert(row: BitableRecord, a: WbAlert): void {
+  try {
+    localStorage.setItem(dismissKeyOf(row, a), a.signature ?? '')
+  } catch {
+    /* 隐私模式写不进：本次会话不闪即可 */
+  }
+  allRecords.value = [...allRecords.value]
+}
+
 function alertCellClass({ row }: { row: BitableRecord }): string {
-  const list = (row as unknown as { alerts?: Array<{ severity?: string }> }).alerts || []
+  const list = alertsOf(row).filter((a) => !isDismissed(row, a))
   if (list.some((a) => a?.severity === 'critical')) return 'cell-alert-critical'
   if (list.some((a) => a?.severity === 'warning')) return 'cell-alert-warning'
   return ''
@@ -1376,6 +1442,16 @@ onMounted(reload)
 .cell-template {
   white-space: pre-line;
 }
+
+.wb-alerts { display: flex; flex-direction: column; gap: 10px; }
+.wb-alert-item { border: 1px solid var(--el-border-color); border-radius: 6px; padding: 10px; }
+.wb-alert-item.critical { border-color: hsl(0 84% 60%); background: hsl(0 84% 98%); }
+.wb-alert-item.warning { border-color: hsl(38 92% 60%); background: hsl(38 92% 98%); }
+.wb-alert-head { display: flex; justify-content: space-between; align-items: baseline; }
+.wb-alert-title { font-weight: 600; font-size: 13px; }
+.wb-alert-badge { font-size: 11px; color: var(--el-text-color-secondary); }
+.wb-alert-detail { margin-top: 4px; font-size: 12px; color: var(--el-text-color-regular); }
+.wb-alert-done { font-size: 12px; color: var(--el-text-color-placeholder); }
 
 .cell-edit {
   display: flex;
