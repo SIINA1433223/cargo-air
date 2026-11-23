@@ -1612,6 +1612,59 @@
                               v-else-if="['master_no','sync_status','sync_time','fail_reason','ai_recognize_result'].includes(f.column)">
                               {{ display(row.fields[f.column]?.value, 'text') || '—' }}
                             </div>
+                            <el-select
+                              v-else-if="IFREIGHT_PERSON_COLUMNS.has(f.column)"
+                              :model-value="row.fields[f.column]?.value ?? ''"
+                              size="small"
+                              filterable
+                              clearable
+                              style="width: 100%"
+                              @change="(v: string) => saveRelatedField(rb, row, f.column, v)">
+                              <el-option v-for="p in staffOptions" :key="p.id" :label="p.name" :value="p.name" />
+                            </el-select>
+                            <el-select
+                              v-else-if="IFREIGHT_VENDOR_COLUMNS.has(f.column)"
+                              :model-value="row.fields[f.column]?.value ?? ''"
+                              size="small"
+                              filterable
+                              clearable
+                              style="width: 100%"
+                              @change="(v: string) => saveRelatedField(rb, row, f.column, v)">
+                              <el-option v-for="v in vendorOptions" :key="v.id" :label="v.name" :value="v.name" />
+                            </el-select>
+                            <el-select
+                              v-else-if="IFREIGHT_CITY_COLUMNS.has(f.column)"
+                              :model-value="row.fields[f.column]?.value ?? ''"
+                              size="small"
+                              filterable
+                              remote
+                              :remote-method="searchPortOptions"
+                              :loading="portOptionsLoading"
+                              clearable
+                              placeholder="三字代码"
+                              style="width: 100%"
+                              @change="(v: string) => saveRelatedField(rb, row, f.column, v)">
+                              <el-option
+                                v-for="p in portOptions"
+                                :key="`${p.code}-${p.name}`"
+                                :label="`${p.code} ${p.name}`"
+                                :value="p.code" />
+                            </el-select>
+                            <el-select
+                              v-else-if="IFREIGHT_OPTION_COLUMNS.includes(f.column as any)"
+                              :model-value="row.fields[f.column]?.value ?? ''"
+                              size="small"
+                              filterable
+                              allow-create
+                              clearable
+                              style="width: 100%"
+                              @change="(v: string) => saveRelatedField(rb, row, f.column, v)">
+                              <el-option
+                                v-for="o in ifreightOptionsFor(f.column)"
+                                :key="o"
+                                :label="o"
+                                :value="o" />
+                            </el-select>
                             <el-input
                               v-else
                               size="small"
@@ -3137,6 +3190,51 @@ const feeAdd = reactive({
 const billlibOpen = ref(false)
 const billlibValue = ref<number | null>(null)
 const billlibTarget = ref<RelatedRow | null>(null)
+// iFreight 展开体上的字段类型（妙搭里全是选项/人员/客商/三字代码，不该是自由输入）
+const IFREIGHT_PERSON_COLUMNS = new Set(['sales_person', 'opportunity_person', 'domestic_operation'])
+const IFREIGHT_VENDOR_COLUMNS = new Set(['foreign_agent', 'booking_agent'])
+const IFREIGHT_CITY_COLUMNS = new Set(['origin_city_code', 'dest_city_code'])
+const IFREIGHT_OPTION_COLUMNS = [
+  'document_type',
+  'cargo_receiving_method',
+  'business_type',
+  'pp_currency',
+  'business_department',
+  'route',
+  'airline_company',
+  'freight_payment_method',
+  'surcharge_payment_method',
+  'piece_unit',
+] as const
+const ifreightOptions = reactive<Record<string, string[]>>({})
+
+async function loadIfreightOptions() {
+  await Promise.all(
+    IFREIGHT_OPTION_COLUMNS.map(async (column) => {
+      if (ifreightOptions[column]?.length) return
+      try {
+        const res = await request<any>({
+          url: '/weida/column-options',
+          method: 'get',
+          params: { table: 'biz_ifreight', column },
+        })
+        ifreightOptions[column] = res.data?.data ?? []
+      } catch {
+        ifreightOptions[column] = []
+      }
+    }),
+  )
+  // 单据类型是规则字段，库里可能还没有选项：按妙搭口径补两份兜底
+  if (!ifreightOptions.document_type.length) ifreightOptions.document_type = ['直单', '分单']
+}
+
+function ifreightOptionsFor(column: string): string[] {
+  if (column === 'document_type' && !ifreightOptions.document_type?.length) {
+    return ['直单', '分单']
+  }
+  return ifreightOptions[column] || []
+}
+
 const ifreightDetailRows = [
   // 照妙搭 detailRows 逐行摆（一行 2~4 格）
   [{ column: 'document_type', label: '单据类型' }, { column: 'house_bl_no', label: '分单号' }, { column: 'cargo_receiving_method', label: '揽货方式' }, { column: 'master_no', label: '主单号' }],
@@ -4960,6 +5058,7 @@ async function openDetail(row: Row) {
         loadDetailAttachment('发票'),
         loadDetailAttachment('头程入货通知'),
         loadDetailAttachment('二程入货通知'),
+        void loadIfreightOptions(),
         loadDetailAttachment('国内邮件'),
         loadDetailAttachment('国外邮件'),
         loadDetailAttachment('相关资料'),

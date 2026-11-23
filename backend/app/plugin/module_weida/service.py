@@ -2139,6 +2139,17 @@ OPTION_COLUMNS = {
     ("biz_opportunity", "transport_clause"),
     ("biz_opportunity", "destination_port"),
     ("biz_opportunity", "goods_special_attr"),
+    # iFreight 展开体上的选项字段（妙搭里都是单选/多选，不该是自由输入）
+    ("biz_ifreight", "document_type"),
+    ("biz_ifreight", "cargo_receiving_method"),
+    ("biz_ifreight", "business_type"),
+    ("biz_ifreight", "pp_currency"),
+    ("biz_ifreight", "business_department"),
+    ("biz_ifreight", "route"),
+    ("biz_ifreight", "airline_company"),
+    ("biz_ifreight", "freight_payment_method"),
+    ("biz_ifreight", "surcharge_payment_method"),
+    ("biz_ifreight", "piece_unit"),
 }
 
 
@@ -6218,18 +6229,20 @@ async def create_order_ifreight(order_id: int) -> dict[str, Any]:
         result = await session.execute(
             text(
                 "INSERT INTO biz_ifreight "
-                "(customer_ref_no, domestic_operation, business_type, "
-                " customs_declaration_goods_name, goods_description, transport_mode, "
-                " client_name, airline_company, transport_clause, is_direct_order, "
+                "(customer_ref_no, domestic_operation, business_type, document_type, "
+                " cargo_receiving_method, customs_declaration_goods_name, goods_description, "
+                " transport_mode, client_name, airline_company, transport_clause, is_direct_order, "
                 " business_department, remark, quantity, gross_weight, volume, dimension) "
-                "VALUES (:ref, :domestic, :biz, :goods_name, :goods_desc, :transport, "
-                " :client, :airline, :clause, :direct, :dept, :remark, "
+                "VALUES (:ref, :domestic, :biz, :doctype, :cargo_method, :goods_name, :goods_desc, "
+                " :transport, :client, :airline, :clause, :direct, :dept, :remark, "
                 " :quantity, :gross_weight, :volume, :dimension)"
             ),
             {
                 "ref": order.get("client_ref_no"),
                 "domestic": order.get("domestic_operation"),
-                "biz": "空运出口",
+                "biz": "直客单",
+                "doctype": "直单" if str(order.get("is_direct") or "") in ("是", "1") else "分单",
+                "cargo_method": "自揽货",
                 "goods_name": order.get("goods_name_special_attr"),
                 "goods_desc": order.get("goods_data") or order.get("goods_name_special_attr"),
                 "transport": order.get("customs_declaration_method"),
