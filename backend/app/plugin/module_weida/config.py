@@ -732,3 +732,25 @@ DETAIL_ACTIONS: dict[str, tuple[str, str, str]] = {
     "invoice_issuance": ("开票", "已开票", "开票"),
     "second_pickup_email": ("二程提货邮件", "已发二程提货邮件", "提货计划"),
 }
+
+
+# 国内操作订单表的「历史底稿」：妙搭 ops-baseline 那 64 条飞书记录（发版那一刻已有的单）。
+# 这些单永远不加粗；之后新进来的单没点开过才加粗（妙搭 rowHints.unreadBold）。
+OPS_BASELINE_FEISHU_IDS = frozenset({
+    "reczz28HewrCz8uZ", "reczz28HhFHH9CeI", "reczz28KjoVI0Ekh", "reczz28KmIPUrgbi",
+    "reczz28Kn9vjigMT", "reczz28KrZd1xwKq", "reczz28L8nCRudTb", "reczz28L9OtUtPUB",
+    "reczz28LAPsywLNg", "reczz28LCQiR2IzW", "reczz28LCdMp0iSv", "reczz28LD8svz8ZQ",
+    "reczz28LEzPpzF44", "reczz28LFgYTbJb0", "reczz28LFk6gTwu5", "reczz28LGGwrghDI",
+    "reczz28LGKJJgKD1", "reczz28LWzzh4ZaW", "reczz28LX9NjX2VK", "reczz28LXIphQBRD",
+    "reczz28LXRGyz0Aq", "reczz28LcpVoVW48", "reczz28LedLVVCjF", "reczz28LefRAnYms",
+    "reczz28M90ktwnY7", "reczz28MIrFgevR8", "reczz28MKpjhG5Ro", "reczz28MLVJ74DmD",
+    "reczz28MOOrRxi0t", "reczz28MRPvmi2V2", "reczz28MS5NJqbxk", "reczz28Mj4y0RREU",
+    "reczz28Mj906I8rL", "reczz28MjXBSneo1", "reczz28MkTQRzOCm", "reczz28MktqWWGQR",
+    "reczz28Mn44QXw0J", "reczz28MnLp99pbf", "reczz28MoOXQtvGW", "reczz28Mook6dWJL",
+    "reczz28MpWbLCT3j", "reczz28MpxZMYCPd", "reczz28N60yEDwh9", "reczz28N7IFhAeul",
+    "reczz28N7bqtkgSj", "reczz28N8Phndri2", "reczz28NCaW96W7l", "reczz28NCwkXtFdV",
+    "reczz28NDsEAQc3W", "reczz28NF1FRo2AI", "reczz28NF3pgPo1P", "reczz28NFGN0Bf0N",
+    "reczz28NFnFtMV6M", "reczz28NGB6Hy8Hi", "reczz28NW1cTLege", "reczz28NXSbkh6d9",
+    "reczz28NZgM482tx", "reczz28Nb6NK0teY", "reczz28NbUvGkbyN", "reczz28NbvCZzF2E",
+    "reczz28Nc15nTc8k", "reczz28Ncs41Vk43", "reczz28NtmMFMXP9", "reczz28Ntt0QN8zu",
+})

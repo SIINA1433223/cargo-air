@@ -2422,6 +2422,7 @@ type DisplayCol =
 type FieldValue = { label: string; value: any; step?: number | null }
 type Row = {
   id: number
+  is_new?: boolean
   fields: Record<string, FieldValue>
   handover?: { to_name?: string; end_at?: string; can_cancel?: boolean }
   weekend_check?: { pending: boolean; items: Record<string, boolean> }
@@ -2770,6 +2771,8 @@ function markSeen(id: number) {
 }
 
 function isUnread(record: Row): boolean {
+  // 妙搭 ops-baseline：发版那一刻已有的历史单永不加粗
+  if (record.is_new === false) return false
   return !seenIds.value.has(Number(record.id))
 }
 
@@ -4483,6 +4486,10 @@ async function onStatusClick(row: Row) {
 }
 
 function statusPillStyle(value: string) {
+  // 航线价格：只有「未报价」上色（妙搭），其余三档是中性字
+  if (role.value === 'pricing' && value !== '未报价') {
+    return { backgroundColor: 'transparent', border: '1px solid #ddd7ca', color: '#6b655c' }
+  }
   const color = STATUS_TINTS[value]
   const match = color && /^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/.exec(color)
   const strong = match
@@ -7797,7 +7804,7 @@ onUnmounted(disconnectEvents)
   word-break: break-all;
 }
 
-.wb-table :deep(.wb-row-unread td) { font-weight: 600; }
+.wb-table :deep(.wb-row-unread td) { font-weight: 700; color: #000; }
 
 /* 表头由 Ant 的 scroll.y 固定，横向滚动交给 .ant-table-body */
 .wb-table :deep(.ant-table) {

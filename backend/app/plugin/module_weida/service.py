@@ -29,6 +29,7 @@ from .booking import render as render_booking
 from .config import (
     DETAIL_ACTIONS,
     LABEL_FALLBACK,
+    OPS_BASELINE_FEISHU_IDS,
     TYPE_MAP,
     LinkBlockDef,
     WorkbenchDef,
@@ -1689,13 +1690,18 @@ async def list_records(
                     }
         if wb.role == "domestic_ops":
             bill_status = await _ops_bill_status(session, rows)
-            for item in items:
+            for item, row in zip(items, rows):
                 status = bill_status.get(int(item["id"]), {})
                 item["fields"]["bill_status"] = {
                     "label": "账单状态",
                     "value": status.get("label", ""),
                     "step": status.get("step"),
                 }
+                # 历史底稿里的单永不加粗（妙搭 ops-baseline）
+                item["is_new"] = (
+                    str(row.get("feishu_record_id") or "")
+                    not in OPS_BASELINE_FEISHU_IDS
+                )
     return {
         "items": items,
         "total": int(total),
