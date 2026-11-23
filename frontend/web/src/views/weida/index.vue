@@ -7014,6 +7014,25 @@ async function runAction(field: string) {
       ElMessage.success(`邮件已发送到操作邮箱${attached ? `，附 ${attached} 个附件` : ''}`)
       return
     }
+    if (field === 'second_pickup_email' && role.value === 'domestic_ops' && detail.value) {
+      const res = await request<any>({
+        url: `/weida/domestic_ops/orders/${detail.value.id}/second-leg-mail`,
+        method: 'post',
+      })
+      const data = res.data?.data || {}
+      const fresh = await request<any>({
+        url: `/weida/${role.value}/records/${detail.value.id}`,
+        method: 'get',
+      })
+      if (fresh.data?.data) {
+        detail.value = fresh.data.data
+        const index = rows.value.findIndex((r) => r.id === fresh.data.data.id)
+        if (index >= 0) rows.value[index] = fresh.data.data
+      }
+      ElMessage.success(data.message || '已执行')
+      if (data.action === 'xanda' && detail.value) await loadRelatedBlocks(detail.value.id)
+      return
+    }
     if (field === 'create_ifreight_data' && role.value === 'domestic_ops' && detail.value) {
       await request({
         url: `/weida/domestic_ops/orders/${detail.value.id}/ifreight`,

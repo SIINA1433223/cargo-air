@@ -5861,8 +5861,81 @@ AIRPORT_CITY = {
 }
 
 
-async def xanda_sync_order(order_id: int) -> dict[str, Any]:
-    """订单勾发提货邮件且车队含云港先达 → 写入本地车队计划。"""
+async def send_second_leg_mail(order_id: int) -> dict[str, Any]:
+    """二程提货邮件：二程车队含云港先达 → 同步先达表；否则发信（带二程入货通知）。"""
+    from .mailer import send_mail
+
+    async with async_db_session() as session:
+        order = (
+            await session.execute(
+                text("SELECT * FROM biz_order WHERE id=:id AND is_deleted=0"), {"id": order_id}
+            )
+        ).mappings().first()
+        if not order:
+            raise HTTPException(status_code=404, detail="订单不存在")
+        await session.execute(
+            text("UPDATE biz_order SET second_pickup_email=1, update_time=NOW(3) WHERE id=:id"),
+            {"id": order_id},
+        )
+        await session.commit()
+    order_no = order.get("order_no") or order.get("master_no") or str(order_id)
+    if "云港先达" in str(order.get("second_fleet") or ""):
+        result = await xanda_sync_order(
+            order_id, fleet_field="second_fleet", trigger_field="second_pickup_email"
+        )
+        return {"action": "xanda", **result, "message": f"{order_no}：已同步先达表"}
+    subject = f"二程提货邮件-{order.get('house_bl_no') or order.get('master_no') or order_no}"
+    lines = [
+        f"订单编号：{order.get('order_no') or ''}",
+        f"分单号：{order.get('house_bl_no') or ''}",
+        f"货物数据：{order.get('goods_data') or ''}",
+        f"二程车队：{order.get('second_fleet') or ''}",
+        f"二程提货费：{order.get('second_pickup_fee') or ''}",
+        f"二程进仓时间：{_text_date(order.get('second_warehouse_time'))}",
+        f"二程送达时间：{_text_date(order.get('second_delivery_time'))}",
+        f"二程司机信息：{order.get('second_driver_info') or ''}",
+        f"备注：{order.get('second_remark') or ''}",
+    ]
+    files: list[tuple[str, bytes, str]] = []
+    try:
+        async with async_db_session() as session:
+            rows = (
+                await session.execute(
+                    text(
+                        "SELECT file_name, storage_key FROM biz_attachment WHERE "
+                        "owner_table='order' AND owner_id=:id AND field='二程入货通知' ORDER BY id"
+                    ),
+                    {"id": order_id},
+                )
+            ).mappings().all()
+        for item in rows:
+            path = Path(str(item["storage_key"]))
+            if path.exists():
+                files.append((str(item["file_name"]), path.read_bytes(), "application/octet-stream"))
+        await run_in_threadpool(
+            send_mail,
+            "weida-tao@foxmail.com",
+            subject,
+            "\n".join(line for line in lines if line.split("：", 1)[-1].strip()),
+            profile="default",
+            attachments=files,
+        )
+    except Exception:
+        async with async_db_session() as session:
+            await session.execute(
+                text("UPDATE biz_order SET second_pickup_email=0 WHERE id=:id"), {"id": order_id}
+            )
+            await session.commit()
+        raise
+    return {"action": "mail", "attachments": len(files), "message": f"{order_no}：二程提货邮件已发送"}
+
+
+async def xanda_sync_order(
+    order_id: int,
+    fleet_field: str = "pickup_fleet",
+    trigger_field: str = "send_pickup_email",
+) -> dict[str, Any]:
+    """订单勾了提货邮件且车队含云港先达 → 写入本地车队计划（二程也走这条）。"""
     async with async_db_session() as session:
         order = (
             await session.execute(
@@ -5871,9 +5944,9 @@ async def xanda_sync_order(order_id: int) -> dict[str, Any]:
         ).mappings().first()
     if not order:
         return {"action": "skipped", "reason": "订单不存在"}
-    if order.get("send_pickup_email") not in (1, True):
-        return {"action": "skipped", "reason": "未勾发提货邮件"}
-    if "云港先达" not in str(order.get("pickup_fleet") or ""):
+    if order.get(trigger_field) not in (1, True):
+        return {"action": "skipped", "reason": "提货邮件未勾选"}
+    if "云港先达" not in str(order.get(fleet_field) or ""):
         return {"action": "skipped", "reason": "车队不含云港先达"}
     ledger = str(order.get("master_no") or order.get("client_ref_no") or "").strip()
     if not ledger:
@@ -6268,7 +6341,7 @@ async def create_order_ifreight(order_id: int) -> dict[str, Any]:
                 "biz": "直客单（Direct client）",
                 # 飞书「国内操作选项设置」的 BlType 选项是 主单(M)/分单(H)/直走单(D)；
                 # 「是否直单=是」对应直接出主单（M），否则按分单（H）
-                "doctype": "主单" if str(order.get("is_direct") or "") in ("是", "1") else "分单",
+                "doctype": "直走单" if str(order.get("is_direct") or "") in ("是", "1") else "分单",
                 "cargo_method": "自揽货（Local）",
                 "goods_name": order.get("goods_name_special_attr"),
                 "goods_desc": order.get("goods_data") or order.get("goods_name_special_attr"),

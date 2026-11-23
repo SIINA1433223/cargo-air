@@ -835,6 +835,17 @@ async def ref_options_sync_route() -> Any:
 
 
 @WeidaRouter.post(
+    "/domestic_ops/orders/{order_id}/second-leg-mail",
+    summary="二程提货邮件（先达同步或发信）",
+)
+async def second_leg_mail_route(order_id: int) -> Any:
+    from .service import send_second_leg_mail
+
+    result = await send_second_leg_mail(order_id)
+    return SuccessResponse(data=result, msg=result.get("message", "已执行"))
+
+
+@WeidaRouter.post(
     "/domestic_ops/ifreight/{ifreight_id}/sync-ifreight",
     summary="同步到 iFreight（SaveAirBooking，Java 引擎契约）",
 )
