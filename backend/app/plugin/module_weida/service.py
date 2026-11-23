@@ -6265,11 +6265,11 @@ async def create_order_ifreight(order_id: int) -> dict[str, Any]:
             {
                 "ref": order.get("client_ref_no"),
                 "domestic": order.get("domestic_operation"),
-                "biz": "直客单",
+                "biz": "直客单（Direct client）",
                 # 飞书「国内操作选项设置」的 BlType 选项是 主单(M)/分单(H)/直走单(D)；
                 # 「是否直单=是」对应直接出主单（M），否则按分单（H）
                 "doctype": "主单" if str(order.get("is_direct") or "") in ("是", "1") else "分单",
-                "cargo_method": "自揽货",
+                "cargo_method": "自揽货（Local）",
                 "goods_name": order.get("goods_name_special_attr"),
                 "goods_desc": order.get("goods_data") or order.get("goods_name_special_attr"),
                 "transport": order.get("customs_declaration_method"),
