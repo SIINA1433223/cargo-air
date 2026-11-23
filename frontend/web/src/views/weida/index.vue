@@ -1016,7 +1016,7 @@
                 class="wb-order-card">
                 <div class="wb-order-grid">
                   <div
-                    v-for="c in block.columns"
+                    v-for="c in blockColumns(block)"
                     :key="c.column"
                     class="wb-order-field"
                     :class="{ 'wb-order-wide': isOrderWide(c) }">
@@ -5653,11 +5653,27 @@ async function removeAttachment(a: AttachmentItem) {
   }
 }
 
+function blockColumns(block: LinkBlock): Col[] {
+  // 交接操作：提货车队/提货信息/提货费 只在「是否需要提货=是」时出现（妙搭 visibility）
+  if (block.key !== 'handover') return block.columns
+  const pickup = String(detail.value?.fields.need_pickup?.value ?? '').trim() === '是'
+  if (pickup) return block.columns
+  return block.columns.filter(
+    (c) => !['pickup_fleet', 'pickup_info', 'pickup_fee'].includes(c.column),
+  )
+}
+
 function detailGroups(section: { label: string; fields: Col[] }) {
   if (section.label !== '提货计划') return [{ label: '', fields: section.fields }]
+  // 妙搭：分单号/货物数据/货物品名/起运地 四项独立摆在上方，头程 9 项、二程 7 项各成一块
+  const head = new Set(['house_bl_no', 'goods_data', 'goods_name_special_attr', 'departure_location'])
   return [
-    { label: '头程', fields: section.fields.filter((f) => !f.column.startsWith('second_')) },
-    { label: '二程', fields: section.fields.filter((f) => f.column.startsWith('second_')) },
+    { label: '', fields: section.fields.filter((f) => head.has(f.column)) },
+    {
+      label: '头程',
+      fields: section.fields.filter((f) => !head.has(f.column) && !f.column.startsWith('second_')),
+    },
+    { label: '二程', fields: section.fields.filter((f) => !head.has(f.column) && f.column.startsWith('second_')) },
   ]
 }
 
