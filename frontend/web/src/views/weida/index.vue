@@ -1152,6 +1152,7 @@
                       v-model="orderDraft[relatedOrders[0].id][c.column]"
                       :field="c"
                       :person-options="staffOptions"
+                      :vendor-options="vendorOptions"
                       :readonly-value="blockValue(relatedOrders[0], c.column)" />
                   </div>
                 </div>
