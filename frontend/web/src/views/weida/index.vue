@@ -239,7 +239,7 @@
                 <div
                   class="wb-status-cell"
                   :class="{ 'wb-alert-flashing': record.alerts?.some((a: any) => a.severity === 'critical') }"
-                  @click="openAlertId = record.alerts?.length ? record.id : null">
+                  @click="openAlerts(record)">
                   <span
                     v-if="record.fields.single_status?.value"
                     class="wb-status-pill"
@@ -250,43 +250,13 @@
                     {{ record.fields.single_status.value }}
                   </span>
                   <span v-else class="cell-empty">—</span>
-                  <!-- 整格可点：点状态格任意处都弹提醒（与妙搭一致）；红色叹号保留但只是标记 -->
-                  <el-popover
+                  <!-- 整格可点：点状态格任意处都弹「这票的提醒」对话框（与妙搭一致） -->
+                  <span
                     v-if="record.alerts?.length"
-                    placement="bottom-start"
-                    :width="340"
-                    :visible="openAlertId === record.id"
-                    @update:visible="(v: boolean) => (openAlertId = v ? record.id : null)">
-                    <template #reference>
-                      <span
-                        class="wb-alert-dot"
-                        :class="record.alerts[0].severity === 'critical' ? 'is-critical' : 'is-warning'"
-                        @click.stop="openAlertId = openAlertId === record.id ? null : record.id">
-                        !
-                      </span>
-                    </template>
-                    <div class="wb-alert-panel">
-                      <div v-for="a in record.alerts" :key="a.title + a.detail" class="wb-alert-item">
-                        <div class="wb-alert-title">{{ a.title }}</div>
-                        <div class="wb-alert-detail">{{ a.detail }}</div>
-                      </div>
-                      <el-button
-                        v-if="record.alerts.some((a) => a.title === '客人未确认账单')"
-                        size="small"
-                        type="primary"
-                        @click.stop="markBillConfirmed(record)">
-                        标记已确认
-                      </el-button>
-                      <el-button
-                        v-for="a in record.alerts.filter((x) => x.action)"
-                        :key="a.title + a.action!.field"
-                        size="small"
-                        @click.stop="runAlertAction(record, a)">
-                        {{ a.action!.label }}
-                      </el-button>
-                      <el-button size="small" @click.stop="dismissAlert(record, record.alerts[0])">取消提醒</el-button>
-                    </div>
-                  </el-popover>
+                    class="wb-alert-dot"
+                    :class="record.alerts[0].severity === 'critical' ? 'is-critical' : 'is-warning'">
+                    !
+                  </span>
                   <span v-if="record.weekend_check?.pending" class="wb-weekend-dot" title="周末/节假日进仓待确认" @click.stop="openWeekend(record)">!</span>
                   <span v-if="record.flight_changed" class="wb-flight-changed">航班更新</span>
                   <span
@@ -1435,6 +1405,40 @@
         </template>
       </a-drawer>
     </template>
+
+    <el-dialog v-model="alertDialogOpen" :title="`这票的提醒（${alertDialogRecord?.alerts?.length || 0}）`" width="480px">
+      <div class="wb-alert-panel">
+        <div class="wb-alert-hint">点「取消提醒」只关掉这一条，数据再变会重新提醒；能当场补的可以直接执行。</div>
+        <div
+          v-for="a in alertDialogRecord?.alerts || []"
+          :key="a.title + a.detail"
+          class="wb-alert-item"
+          :class="a.severity">
+          <div class="wb-alert-head">
+            <span class="wb-alert-title">{{ a.title }}</span>
+            <span class="wb-alert-time">{{ alertTimeText(a) }}</span>
+          </div>
+          <div class="wb-alert-detail">{{ a.detail }}</div>
+          <div class="wb-alert-actions">
+            <span class="wb-alert-badge" :class="a.severity">{{ alertBadgeText(a) }}</span>
+            <el-button
+              v-if="a.action"
+              size="small"
+              type="primary"
+              @click.stop="runAlertAction(alertDialogRecord, a)">
+              {{ a.action.label }}
+            </el-button>
+            <el-button
+              v-if="alertDialogRecord?.alerts?.some((x: any) => x.title === '客人未确认账单') && a.title === '客人未确认账单'"
+              size="small"
+              @click.stop="markBillConfirmed(alertDialogRecord)">
+              标记已确认
+            </el-button>
+            <el-button size="small" text @click.stop="dismissAlertFromDialog(a)">取消提醒</el-button>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
 
     <el-dialog v-model="weekendOpen" title="周末/节假日进仓确认" width="440px">
       <el-checkbox-group v-model="weekendChecked" class="wb-weekend-checks">
@@ -2703,7 +2707,38 @@ const TODO_LABELS: Record<string, string> = {
   issue_operation_plan: '出操作计划',
   send_forecast: '发送预报',
 }
-const openAlertId = ref<number | null>(null)
+const alertDialogOpen = ref(false)
+const alertDialogRecord = ref<any>(null)
+
+function openAlerts(record: any): void {
+  if (!record?.alerts?.length) return
+  alertDialogRecord.value = record
+  alertDialogOpen.value = true
+}
+
+/** 弹框里取消：调原来的 dismissAlert，并把这一条从本地副本里摘掉（立刻消失）。 */
+function dismissAlertFromDialog(a: any): void {
+  const rec = alertDialogRecord.value
+  if (!rec) return
+  dismissAlert(rec, a)
+  rec.alerts = rec.alerts.filter((x: any) => x !== a)
+  if (rec.alerts.length === 0) alertDialogOpen.value = false
+}
+
+function alertTimeText(a: any): string {
+  const ms = Number(a?.at || 0)
+  if (!ms) return ''
+  const d = new Date(ms)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getMonth() + 1}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+const FEEDBACK_TITLES = new Set(['报价单录入反馈', '国内账单录入反馈', '国外账单录入反馈', '系统开票反馈'])
+function alertBadgeText(a: any): string {
+  if (a?.severity === 'info') return '已完成'
+  if (a?.severity === 'critical') return FEEDBACK_TITLES.has(a?.title) ? '待处理 · 失败' : '待处理'
+  return '待处理'
+}
 const todoFields = computed(() => config.value?.todo_checkboxes ?? [])
 const linkBlocks = computed(() => config.value?.link_blocks ?? [])
 const relatedBlocks = computed(() => config.value?.related_blocks ?? [])
@@ -6827,10 +6862,24 @@ onUnmounted(disconnectEvents)
   flex-direction: column;
   gap: 8px;
 }
+.wb-alert-hint { font-size: 12px; color: #8a8378; margin-bottom: 8px; }
 .wb-alert-item {
-  border-bottom: 1px solid #f0ece4;
-  padding-bottom: 6px;
+  border: 1px solid #e8e2d6;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
 }
+/* 与妙搭同一套：失败/待处理用红边红底，提示用中性 */
+.wb-alert-item.critical { border-color: hsl(0 84% 62%); background: hsl(0 84% 98%); }
+.wb-alert-item.warning { border-color: hsl(38 92% 62%); background: hsl(38 92% 98%); }
+.wb-alert-item.info { border-color: #e2dccf; background: #faf8f3; }
+.wb-alert-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.wb-alert-time { font-size: 11px; color: #a8a094; flex-shrink: 0; }
+.wb-alert-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.wb-alert-badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; }
+.wb-alert-badge.critical { background: hsl(0 84% 55%); color: #fff; }
+.wb-alert-badge.warning { background: hsl(38 92% 50%); color: #fff; }
+.wb-alert-badge.info { background: #e8e2d6; color: #6b655c; }
 .wb-alert-title {
   font-size: 13px;
   font-weight: 600;
