@@ -545,6 +545,9 @@ def _parse_filters(raw: str | None, allowed: set[str]) -> list[dict[str, Any]]:
     return out
 
 
+KEYWORD_TYPES = {"text", "textarea", "select", "multiselect", "json", "date", "datetime", "number"}
+
+
 def _where_clause(
     wb: WorkbenchDef,
     allowed: set[str],
@@ -552,10 +555,22 @@ def _where_clause(
     filters: list[dict[str, Any]],
     params: dict[str, Any],
     conjunction: str = "and",
+    meta: dict[str, dict[str, Any]] | None = None,
 ) -> str:
     clauses = ["is_deleted = 0"]
     if keyword:
-        fields = [c for c in wb.search_fields if c in allowed]
+        # 与妙搭一致：关键词搜**这一行的全部字段**（不限 search_fields）。
+        # 之前只搜 search_fields，操作台没点 商机编号，所以搜不到；
+        # 这里按物理列类型挑可搜的，再并上 search_fields。
+        fields = list(wb.search_fields)
+        if meta:
+            fields += [
+                col
+                for col, info in meta.items()
+                if col not in wb.hidden
+                and str(info.get("type") or "").split("(")[0].strip().lower() in KEYWORD_TYPES
+            ]
+        fields = [c for c in dict.fromkeys(fields) if c in allowed]
         if fields:
             ors = []
             params["kw"] = f"%{keyword}%"
@@ -1615,7 +1630,7 @@ async def list_records(
                 filter_item["value"] = cleaned
         params: dict[str, Any] = {}
         where = _where_clause(
-            wb, allowed, keyword, filters, params, conjunction
+            wb, allowed, keyword, filters, params, conjunction, meta
         )
         scope = await _viewer_scope(
             session, wb, viewer_user_id, viewer_username, params
