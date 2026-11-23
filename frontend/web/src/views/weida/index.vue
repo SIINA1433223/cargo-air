@@ -5265,6 +5265,8 @@ function openCreate() {
 
 async function openDetail(row: Row) {
   markSeen(Number(row.id))
+  // 客商下拉（客户/供应商/国外代理/订舱代理）在抽屉里用，进抽屉时确保已加载
+  if (!vendorOptions.value.length) void loadVendors()
   drawerMode.value = 'edit'
   try {
     const res = await request<any>({
