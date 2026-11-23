@@ -51,6 +51,15 @@
           </a-button>
           <a-button class="wb-t-columns" size="small" @click="columnOpen = true">自定义列</a-button>
           <a-button class="wb-t-paint" size="small" @click="paintOpen = true">填色</a-button>
+          <!-- 比例调整：只缩放索引页表格（弹窗、抽屉不受影响），按账号记本机 -->
+          <el-select
+            class="wb-t-zoom"
+            v-model="tableZoom"
+            size="small"
+            style="width: 100px"
+            @change="saveTableZoom">
+            <el-option v-for="z in ZOOM_OPTIONS" :key="z" :label="`比例 ${z}%`" :value="z" />
+          </el-select>
           <a-dropdown class="wb-t-more" trigger="click">
             <a-button size="small">更多</a-button>
             <template #overlay>
@@ -221,7 +230,10 @@
         </div>
       </div>
       <template v-else>
-        <div ref="tableRef" class="wb-table" :style="{ '--wb-row-height': rowHeight + 'px' }">
+        <div
+          ref="tableRef"
+          class="wb-table"
+          :style="{ '--wb-row-height': rowHeight + 'px', zoom: tableZoom / 100 }">
           <a-table
             :data-source="rows"
             :columns="antColumns"
@@ -2706,6 +2718,17 @@ const blankLabel = ref('')
 const editingTemplateKey = ref('')
 const columnWidths = ref<Record<string, number>>({})
 const rowHeight = ref(54)
+const ZOOM_OPTIONS = [70, 80, 90, 100, 110, 120, 130, 150]
+const tableZoom = ref(100)
+
+function saveTableZoom() {
+  localStorage.setItem(`weida_zoom:${role.value}`, String(tableZoom.value))
+}
+
+function restoreTableZoom() {
+  const saved = Number(localStorage.getItem(`weida_zoom:${role.value}`) || 100)
+  tableZoom.value = ZOOM_OPTIONS.includes(saved) ? saved : 100
+}
 const addColumn = ref('')
 const bindOpen = ref(false)
 const bindItems = ref<Array<Record<string, any>>>([])
@@ -4064,6 +4087,7 @@ function restoreViewConfig() {
   try {
     const savedHeight = Number(localStorage.getItem(`weida_row_height:${role.value}`) || '')
     rowHeight.value = savedHeight >= 30 && savedHeight <= 240 ? savedHeight : 54
+    restoreTableZoom()
   } catch {
     rowHeight.value = 54
   }
