@@ -30,6 +30,25 @@
     <el-option v-for="p in personOptions" :key="personKey(p)" :label="p.name" :value="p.name" />
   </el-select>
   <el-select
+    v-else-if="field.editable && YES_NO_COLUMNS.has(field.column)"
+    v-model="model"
+    size="small"
+    clearable
+    placeholder="请选择"
+    style="width: 100%">
+    <el-option label="是" value="是" />
+    <el-option label="否" value="否" />
+  </el-select>
+  <el-select
+    v-else-if="field.editable && field.column === 'sales_person'"
+    v-model="model"
+    filterable
+    clearable
+    placeholder="选择业务员"
+    style="width: 100%">
+    <el-option v-for="p in personOptions" :key="personKey(p)" :label="p.name" :value="p.name" />
+  </el-select>
+  <el-select
     v-else-if="field.editable && (field as any).options?.length"
     v-model="model"
     filterable
@@ -91,6 +110,13 @@
 </template>
 
 <script setup lang="ts">
+const YES_NO_COLUMNS = new Set([
+  'need_insurance',
+  'need_pickup',
+  'need_appraisal',
+  'need_declaration',
+  'is_direct',
+])
 import { computed } from 'vue'
 
 type Field = {

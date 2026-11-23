@@ -1440,6 +1440,9 @@
                   {{ a.file_name }}
                 </a>
               </div>
+              <div v-if="rb.key === 'ifreight' && role === 'domestic_ops'" class="wb-related-actions">
+                <a-button size="small" type="primary" @click="createIfreightRow">创建 ifreight 分单</a-button>
+              </div>
               <!-- 车队：按「对账分单号」匹配车队数据（件数/毛重/尺码/体积/比例） -->
               <el-table
                 v-if="rb.key === 'fleet'"
@@ -6869,6 +6872,20 @@ async function triggerInstruction(rb: RelatedBlock, row: RelatedRow) {
     if (detail.value) await loadRelatedBlocks(detail.value.id)
   } catch (e: any) {
     ElMessage.error(e?.message || '触发失败')
+  }
+}
+
+async function createIfreightRow() {
+  if (!detail.value) return
+  try {
+    await request({
+      url: `/weida/domestic_ops/orders/${detail.value.id}/ifreight`,
+      method: 'post',
+    })
+    ElMessage.success('已创建分单')
+    await loadRelatedBlocks(detail.value.id)
+  } catch (e: any) {
+    ElMessage.error(e?.message || '创建失败')
   }
 }
 

@@ -2277,6 +2277,23 @@ async def update_record(
             ).mappings().first()
             if current and current.get("is_goods_received") == "是":
                 await _ensure_order(session, current)
+        # 客服交接给国内操作时，若这票还没有 iFreight，自动建一条并带齐应同步的信息
+        need_ifreight = False
+        if (
+            wb.table == "biz_order"
+            and str(payload.get("handover_domestic_operation") or "") in ("1", "True", "是")
+        ):
+            has_ifreight = (
+                await session.execute(
+                    text(
+                        "SELECT 1 FROM biz_link WHERE from_table='order' AND from_id=:id "
+                        "AND to_table='ifreight' AND field='所属订单' LIMIT 1"
+                    ),
+                    {"id": record_id},
+                )
+            ).first()
+            if not has_ifreight:
+                need_ifreight = True
         # 商机 ↔ 订单 共用字段：一边改了，对端同一次提交里跟着改（秒级生效）
         shared_hits = await _propagate_shared(session, wb.table, record_id, payload)
         await session.commit()
@@ -2291,6 +2308,12 @@ async def update_record(
         await publish_event(
             table=target_table, record_id=target_id, fields=changed, actor=actor
         )
+    if need_ifreight:
+        # 事务已提交后再建，避免和本事务的行锁互等
+        try:
+            await create_order_ifreight(record_id)
+        except Exception:
+            pass
     return await get_record(wb, record_id)
 
 
@@ -6494,16 +6517,32 @@ async def create_order_ifreight(order_id: int) -> dict[str, Any]:
         ).mappings().first()
         if not order:
             raise HTTPException(status_code=404, detail="订单不存在")
+        # 商机负责人取该订单关联商机的那一位
+        opp_person = (
+            await session.execute(
+                text(
+                    "SELECT o.opportunity_person_in_charge FROM biz_link l "
+                    "JOIN biz_opportunity o ON o.id = l.from_id AND o.is_deleted = 0 "
+                    "WHERE l.from_table='opportunity' AND l.to_table='order' "
+                    "AND l.field='订单表' AND l.to_id=:id LIMIT 1"
+                ),
+                {"id": order_id},
+            )
+        ).scalar()
         result = await session.execute(
             text(
                 "INSERT INTO biz_ifreight "
                 "(customer_ref_no, domestic_operation, business_type, document_type, "
                 " cargo_receiving_method, customs_declaration_goods_name, goods_description, "
                 " transport_mode, client_name, airline_company, transport_clause, is_direct_order, "
-                " business_department, remark, quantity, gross_weight, volume, dimension) "
+                " business_department, remark, quantity, gross_weight, volume, dimension, "
+                " origin_city_code, dest_city_code, estimated_departure_time, booking_agent, "
+                " foreign_agent, sales_person, opportunity_person) "
                 "VALUES (:ref, :domestic, :biz, :doctype, :cargo_method, :goods_name, :goods_desc, "
                 " :transport, :client, :airline, :clause, :direct, :dept, :remark, "
-                " :quantity, :gross_weight, :volume, :dimension)"
+                " :quantity, :gross_weight, :volume, :dimension, "
+                " :origin_code, :dest_code, :departure_time, :booking_agent, :foreign_agent, "
+                " :sales_person, :opportunity_person)"
             ),
             {
                 "ref": order.get("client_ref_no"),
@@ -6522,6 +6561,13 @@ async def create_order_ifreight(order_id: int) -> dict[str, Any]:
                 "direct": 1 if str(order.get("is_direct") or "") in ("是", "1") else 0,
                 "dept": "空运出口",
                 "remark": order.get("special_note") or order.get("operation_requirement"),
+                "origin_code": order.get("departure_location"),
+                "dest_code": order.get("destination"),
+                "departure_time": order.get("flight"),
+                "booking_agent": order.get("supplier"),
+                "foreign_agent": order.get("foreign_agent_name"),
+                "sales_person": order.get("sales_person"),
+                "opportunity_person": opp_person,
                 **_parse_goods_data(order.get("goods_data")),
             },
         )
