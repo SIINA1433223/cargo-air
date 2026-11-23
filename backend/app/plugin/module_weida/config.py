@@ -378,7 +378,6 @@ WORKBENCHES: dict[str, WorkbenchDef] = {
             "invoice_issuance",
         ),
         no_paging=True,
-        commands=(("send_invoice", "发送发票给客户", "开票"),),
         section_labels=(
             ("提货计划", "pickup_fleet", "头程车队"),
             ("提货计划", "pickup_fee", "头程提货费"),
@@ -510,8 +509,6 @@ WORKBENCHES: dict[str, WorkbenchDef] = {
                     "required_door_time",
                     "goods_data",
                     "level_ratio_req",
-                    "goods_special_attr",
-                    "customer_core_concern",
                 ),
             ),
             (
@@ -556,7 +553,6 @@ WORKBENCHES: dict[str, WorkbenchDef] = {
                     "goods_description",
                     "agent_operation_requirement",
                     "supplier",
-                    "agent_deadline",
                 ),
             ),
             (
@@ -574,11 +570,9 @@ WORKBENCHES: dict[str, WorkbenchDef] = {
                     "customer_name",
                     "foreign_agent_name",
                     "supplier",
-                    "fee_record",
                     "cost_amount",
                     "cost_currency",
                     "level_ratio_req",
-                    "self_fill_add",
                 ),
             ),
             (

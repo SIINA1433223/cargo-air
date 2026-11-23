@@ -465,7 +465,16 @@
               <div v-if="section.label === '开票'" class="wb-invoice-block">
                 <el-form label-position="left" label-width="120px" class="wb-form">
                   <el-form-item label="账单状态">
-                    <el-input v-model="editModel.bill_status" disabled />
+                    <a-select
+                      :value="detail.fields.bill_status?.step ?? undefined"
+                      allow-clear
+                      placeholder="自动"
+                      style="width: 240px"
+                      @change="(v: any) => changeBillStatus(detail as any, v)">
+                      <a-select-option v-for="(label, i) in billStatusOptions" :key="i" :value="i + 1">
+                        {{ label }}
+                      </a-select-option>
+                    </a-select>
                   </el-form-item>
                 </el-form>
                 <h4>发送开票邮件</h4>
@@ -506,7 +515,11 @@
                 label-position="left"
                 label-width="120px"
                 class="wb-form"
-                :class="{ 'wb-form-compact': section.label === '商机详情' }">
+                :class="{
+                  'wb-form-compact':
+                    section.label === '商机详情' ||
+                    (section.label === '货物详情' && role === 'domestic_ops'),
+                }">
                 <template v-for="grp in detailGroups(section)" :key="grp.label">
                   <h4 v-if="grp.label" class="wb-subhead">{{ grp.label }}</h4>
                   <el-form-item v-for="f in grp.fields" :key="f.column" :label="f.label">
@@ -689,7 +702,37 @@
                   <p>{{ detail.fields.customer_operation_requirement?.value || '—' }}</p>
                 </div>
               </div>
+              <div
+                v-if="section.label === '货物详情' && role === 'domestic_ops'"
+                class="wb-attach-block">
+                <div v-for="mailField in ['国内邮件', '国外邮件']" :key="mailField" class="wb-attach-inner">
+                  <h4>{{ mailField }}</h4>
+                  <div v-for="a in detailAttachments[mailField] || []" :key="a.id" class="wb-attach-row">
+                    <a class="wb-attach-link" @click="downloadAttachment(a)">{{ a.file_name }}</a>
+                    <el-button link type="danger" size="small" @click="removeDetailAttachment(a, mailField)">删除</el-button>
+                  </div>
+                  <el-upload
+                    :show-file-list="false"
+                    :http-request="(opt: any) => uploadDetailAttachment(mailField, opt)">
+                    <el-button size="small">上传附件</el-button>
+                  </el-upload>
+                </div>
+              </div>
               <div v-if="section.label === '做账明细'" class="wb-dash-section" style="margin-top: 14px">
+                <div class="wb-attach-block">
+                  <div v-for="docField in ['报价单', '订舱单']" :key="docField" class="wb-attach-inner">
+                    <h4>{{ docField }}</h4>
+                    <div v-for="a in detailAttachments[docField] || []" :key="a.id" class="wb-attach-row">
+                      <a class="wb-attach-link" @click="downloadAttachment(a)">{{ a.file_name }}</a>
+                      <el-button link type="danger" size="small" @click="removeDetailAttachment(a, docField)">删除</el-button>
+                    </div>
+                    <el-upload
+                      :show-file-list="false"
+                      :http-request="(opt: any) => uploadDetailAttachment(docField, opt)">
+                      <el-button size="small">上传附件</el-button>
+                    </el-upload>
+                  </div>
+                </div>
                 <h4>保费计算器</h4>
                 <div class="wb-premium-row">
                   <label>报关金额<el-input v-model="premiumAmount" size="small" /></label>
@@ -2180,7 +2223,7 @@ type DisplayCol =
   | { key: string; label: string; kind: 'field'; column: string; type: string; virtual?: boolean }
   | { key: string; label: string; kind: 'template'; expression: string }
   | { key: string; label: string; kind: 'blank' }
-type FieldValue = { label: string; value: any }
+type FieldValue = { label: string; value: any; step?: number | null }
 type Row = {
   id: number
   fields: Record<string, FieldValue>
@@ -4606,6 +4649,10 @@ async function openDetail(row: Row) {
         loadDetailAttachment('发票'),
         loadDetailAttachment('头程入货通知'),
         loadDetailAttachment('二程入货通知'),
+        loadDetailAttachment('国内邮件'),
+        loadDetailAttachment('国外邮件'),
+        loadDetailAttachment('报价单'),
+        loadDetailAttachment('订舱单'),
       ])
     }
     for (const c of detailFields.value) {
@@ -5391,13 +5438,13 @@ function reorderDetailTabs() {
     '报关',
     '代理到货计划',
     '国外预报',
+    '到货预报表',
     '投保',
     '做账明细',
     '开票',
     '航班查询',
     'iFreight 数据',
     'AI费用',
-    '到货预报表',
   ]
   const items = Array.from(list.querySelectorAll('.ant-tabs-tab')) as HTMLElement[]
   items.sort((a, b) => {
@@ -5422,6 +5469,8 @@ function onDetailTabChange(name: string | number) {
   }
   if (name === '做账明细' && detail.value) {
     void loadAiFees(detail.value.id)
+    void loadDetailAttachment('报价单')
+    void loadDetailAttachment('订舱单')
   }
   if (name === '航班查询' && detail.value) {
     void markFlightSeen()
@@ -7312,6 +7361,19 @@ onUnmounted(disconnectEvents)
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px dashed #e5dfd3;
+}
+.wb-attach-block {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed #e5dfd3;
+}
+.wb-attach-inner + .wb-attach-inner {
+  margin-top: 10px;
+}
+.wb-attach-block h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: #6b655c;
 }
 .wb-attach-row {
   display: flex;
