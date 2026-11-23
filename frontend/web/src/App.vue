@@ -1,4 +1,5 @@
 <template>
+  <a-config-provider :theme="antTheme" :locale="antLocale">
   <ElConfigProvider
     :size="size"
     :locale="locale"
@@ -17,6 +18,7 @@
       <AiAssistant v-if="enableAiAssistant" />
     </ElWatermark>
   </ElConfigProvider>
+  </a-config-provider>
 </template>
 
 <script setup lang="ts">
@@ -33,6 +35,17 @@ import { ThemeMode } from './enums'
 import en from 'element-plus/es/locale/lang/en'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { router } from '@/router'
+import zhCN from 'ant-design-vue/es/locale/zh_CN'
+import type { ThemeConfig } from 'ant-design-vue/es/config-provider/context'
+
+const antLocale = zhCN
+const antTheme: ThemeConfig = {
+  token: {
+    colorPrimary: '#1f4b45',
+    borderRadius: 6,
+    fontSize: 13,
+  },
+}
 
 const appStore = useAppStore()
 const settingsStore = useSettingsStore()

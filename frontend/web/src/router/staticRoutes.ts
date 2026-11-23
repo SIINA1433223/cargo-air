@@ -11,6 +11,7 @@ import type { AppRouteRecord, RouteMeta } from '@/types/router'
 import { defineComponent, h, onMounted, ref } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
 import { RouterView, useRoute } from 'vue-router'
+import { Auth } from '@utils/auth'
 
 /** 首页 / 仪表盘父级 meta（侧栏、静态子路由共用） */
 export const HOME_MENU_META: RouteMeta = {
@@ -189,10 +190,10 @@ function stripRouteRecordForShell(route: RouteRecordRaw): AppRouteRecord {
 }
 
 export const weidaWorkbenchRoute: AppRouteRecord = {
-  name: 'WeidaWorkbench',
+  name: 'WeidaHome',
   path: '/weida',
-  meta: { title: '业务工作台', icon: 'el-icon-Grid', hidden: false, keepAlive: true, rank: 0 },
-  component: () => import('@/views/weida/index.vue'),
+  meta: { title: '业务工作台', icon: 'el-icon-Grid', hidden: false, keepAlive: true, rank: 0, breadcrumb: false },
+  component: () => import('@/views/weida/WeidaHome.vue'),
 } as AppRouteRecord
 
 export function getDashboardMenuTreeForMerge(): AppRouteRecord {
@@ -316,14 +317,18 @@ export const staticRoutes: AppRouteRecordRaw[] = [
   {
     path: '/weida/:role?',
     name: 'WeidaWorkbench',
-    meta: { hidden: true, title: '业务工作台', keepAlive: true },
+    meta: { hidden: true, title: '业务工作台', keepAlive: true, breadcrumb: false },
+    beforeEnter: (to) => {
+      if (Auth.isLoggedIn()) return true
+      return { name: 'Login', query: { redirect: to.fullPath } }
+    },
     component: Layout,
     children: [
       {
         path: '',
         name: 'WeidaWorkbenchHome',
         component: () => import('@/views/weida/index.vue'),
-        meta: { title: '业务工作台', keepAlive: true },
+        meta: { title: '业务工作台', keepAlive: true, breadcrumb: false },
       },
     ],
   },

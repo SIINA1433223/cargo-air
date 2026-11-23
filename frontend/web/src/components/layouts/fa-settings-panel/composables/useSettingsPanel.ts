@@ -118,7 +118,7 @@ export function useSettingsPanel() {
             hasChangedMenu.value = false
           }
 
-          settingStore.setMenuOpen(true)
+          // 桌面端不强制展开：默认保持收起，由用户自己点开。
         }
       },
       { immediate: true }

@@ -480,6 +480,10 @@ export const useSettingsStore = defineStore(
     persist: {
       key: 'setting',
       storage: localStorage,
+      // 每次启动都收起侧栏：不从 localStorage 恢复展开状态。
+      afterHydrate: (ctx) => {
+        ctx.store.menuOpen = false
+      },
     },
   }
 )

@@ -103,6 +103,8 @@ export interface RouteMeta extends Record<string | number | symbol, unknown> {
   showTextBadge?: string
   /** 是否在菜单中隐藏 */
   isHide?: boolean
+  /** 是否在面包屑中隐藏 */
+  breadcrumb?: boolean
   /** 是否在标签页中隐藏 */
   isHideTab?: boolean
   /** 外部链接 */

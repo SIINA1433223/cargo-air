@@ -73,7 +73,7 @@ const breadcrumbItems = computed<BreadcrumbItem[]>(() => {
     return [createBreadcrumbItem(currentRoute)]
   }
 
-  return items
+  return items.filter((item) => item.meta?.breadcrumb !== false && item.meta?.title)
 })
 
 // 辅助函数：判断是否为包裹容器路由

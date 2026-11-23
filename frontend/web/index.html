@@ -47,6 +47,24 @@
         }
       })()
     </script>
+    <script>
+      // 一次性清理旧 Service Worker 与缓存，避免旧壳继续加载旧 chunk。
+      (function () {
+        if (!('serviceWorker' in navigator)) return;
+        var key = 'weida_sw_cleanup_v1'
+        if (sessionStorage.getItem(key)) return
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+          if (!regs.length || !window.caches) return
+          Promise.all(regs.map(function (r) { return r.unregister() }))
+            .then(function () { return caches.keys() })
+            .then(function (keys) { return Promise.all(keys.map(function (k) { return caches.delete(k) })) })
+            .then(function () {
+              sessionStorage.setItem(key, '1')
+              location.reload()
+            })
+        })
+      })()
+    </script>
   </head>
 
   <body>

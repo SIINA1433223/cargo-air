@@ -145,15 +145,15 @@
     align-items: center;
     justify-content: center;
     /* 与工作台同一套：暖纸底 + 深青墨 */
-    background: #f7f4ee;
+    background: hsl(40 36% 95%);
     padding: 24px;
   }
 
   .login-card {
     width: 100%;
     max-width: 380px;
-    background: #fffdf9;
-    border: 1px solid #e5dfd3;
+    background: hsl(40 59% 98%);
+    border: 1px solid hsl(38 25% 85%);
     border-radius: 12px;
     padding: 36px 32px 28px;
     box-shadow: 0 1px 2px rgba(31, 75, 69, 0.04);
@@ -167,7 +167,7 @@
     font-size: 22px;
     font-weight: 600;
     letter-spacing: 0.04em;
-    color: #1f4b45;
+    color: hsl(190 64% 26%);
   }
 
   .brand-sub {
@@ -206,7 +206,7 @@
   }
 
   .input:focus {
-    border-color: #1f4b45;
+    border-color: hsl(190 64% 26%);
   }
 
   .captcha-row {
@@ -248,8 +248,8 @@
     height: 42px;
     border: none;
     border-radius: 8px;
-    background: #1f4b45;
-    color: #f7f4ee;
+    background: #186d6d;
+    color: hsl(40 36% 95%);
     font-size: 15px;
     letter-spacing: 0.08em;
     cursor: pointer;

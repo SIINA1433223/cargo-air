@@ -26,8 +26,8 @@ export async function initRouter(app: App<Element>): Promise<void> {
   app.use(router)
 }
 
-/** 登录后落地页：业务系统直接进价格工作台（框架自带的 /home、/dashboard 已从侧栏移除） */
-export const HOME_PAGE_PATH = '/workbench/price'
+/** 登录后落地页：业务系统默认进国内客服工作台 */
+export const HOME_PAGE_PATH = '/weida/customer-service'
 
 export { HOME_ROUTE_NAME, ROOT_LAYOUT_ROUTE_NAME }
 

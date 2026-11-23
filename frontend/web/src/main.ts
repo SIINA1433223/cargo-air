@@ -10,8 +10,23 @@ import 'animate.css'
 // 应用初始化
 // ---------------------------------------------------------------------------
 import App from './App.vue'
+import { Auth } from '@utils/auth'
 import { createApp } from 'vue'
 import { printConsoleBanner } from '@utils/sys'
+import {
+  Button,
+  ConfigProvider,
+  Drawer,
+  Dropdown,
+  Empty,
+  Input,
+  Menu,
+  Pagination,
+  Select,
+  Table,
+  Tabs,
+  Tag,
+} from 'ant-design-vue'
 import { initPlugins } from '@/plugins'
 
 /**
@@ -37,7 +52,7 @@ function registerServiceWorker(): void {
 
   // 等 load 之后再注册：别和首屏资源抢带宽
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/web/sw.js', { scope: '/web/' }).catch((error) => {
+    navigator.serviceWorker.register('/web/sw.js?v=off-20261123', { scope: '/web/' }).catch((error) => {
       console.warn('[SW] 注册失败，应用不受影响：', error)
     })
   })
@@ -50,7 +65,34 @@ function registerServiceWorker(): void {
  *  挂载后 App.vue 的 onMounted 中初始化站点标题/favicon（需等 Pinia store 就绪）
  */
 ;(async () => {
+  if (!Auth.isLoggedIn() && location.hash.includes('/weida')) {
+    const redirect = location.hash.replace(/^#/, '') || '/weida'
+    location.replace(`${location.pathname}#/login?redirect=${encodeURIComponent(redirect)}`)
+    return
+  }
   const app = createApp(App)
+  const antComponents = {
+    AButton: Button,
+    AConfigProvider: ConfigProvider,
+    ADrawer: Drawer,
+    ADropdown: Dropdown,
+    AEmpty: Empty,
+    AInput: Input,
+    AInputSearch: Input.Search,
+    AMenu: Menu,
+    AMenuDivider: Menu.Divider,
+    AMenuItem: Menu.Item,
+    APagination: Pagination,
+    ASelect: Select,
+    ASelectOption: Select.Option,
+    ATable: Table,
+    ATabPane: Tabs.TabPane,
+    ATabs: Tabs,
+    ATag: Tag,
+  }
+  for (const [name, component] of Object.entries(antComponents)) {
+    app.component(name, component as never)
+  }
   printConsoleBanner()
   await initPlugins(app)
   app.mount('#app')

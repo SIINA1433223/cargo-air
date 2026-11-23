@@ -37,6 +37,8 @@ echarts.use([
   LegendComponent,
 ])
 
+const emit = defineEmits<{ (e: 'click', params: any): void }>()
+
 const props = defineProps<{
   options: echarts.EChartsCoreOption
   width?: string
@@ -52,6 +54,7 @@ const initChart = () => {
     chartInstance = echarts.init(chartRef.value)
     if (props.options) {
       chartInstance.setOption(props.options)
+      chartInstance.on('click', (params) => emit('click', params))
     }
   }
 }

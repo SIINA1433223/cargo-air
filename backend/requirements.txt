@@ -230,6 +230,8 @@ onnxruntime==1.30.0
 openai==2.28.0
     # via backend (pyproject.toml)
 openpyxl==3.1.5
+pypdf==6.21.4
+pymupdf==1.28.2
     # via backend (pyproject.toml)
 opentelemetry-api==1.39.1
     # via

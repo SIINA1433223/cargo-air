@@ -59,15 +59,16 @@
         :style="{
           background: getMenuTheme.background,
         }">
-        <FaLogo v-if="!isDualMenu" class="logo" :src="sidebarLogoSrc" />
+        <FaLogo v-if="!isDualMenu && !isWeida" class="logo" :src="sidebarLogoSrc" />
 
         <p
           :class="{ 'is-dual-menu-name': isDualMenu }"
           :style="{
             color: getMenuTheme.systemNameColor,
-            opacity: !menuOpen ? 0 : 1,
+            opacity: !menuOpen && !isWeida ? 0 : 1,
+            whiteSpace: 'nowrap',
           }">
-          {{ sidebarTitle }}
+          {{ isWeida ? '青岛威达' : sidebarTitle }}
         </p>
       </div>
       <ElScrollbar :style="scrollbarStyle">
@@ -127,6 +128,8 @@ const settingStore = useSettingsStore()
 const configStore = useConfigStore()
 
 /** 与旧版 layouts/old/components/AppLogo 一致：参数 sys_web_logo / sys_web_title */
+const isWeida = computed(() => route.path.startsWith('/weida'))
+
 const sidebarLogoSrc = computed(() => {
   const raw = configStore.configData.sys_web_logo?.config_value
   return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined
@@ -140,6 +143,11 @@ const sidebarTitle = computed(() => {
 
 const { getMenuOpenWidth, menuType, uniqueOpened, dualMenuShowText, menuOpen, getMenuTheme, showAppLogo } =
   storeToRefs(settingStore)
+
+if (route.path.startsWith('/weida')) settingStore.setMenuOpen(false)
+onMounted(() => {
+  if (route.path.startsWith('/weida')) settingStore.setMenuOpen(false)
+})
 
 // 组件内部状态
 const defaultOpenedMenus = ref<string[]>([])
