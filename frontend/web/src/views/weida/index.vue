@@ -6620,12 +6620,16 @@ async function triggerInstruction(rb: RelatedBlock, row: RelatedRow) {
 
 async function syncRelated(rb: RelatedBlock, row: RelatedRow) {
   try {
-    await request({
-      url: `/weida/domestic_ops/records/${detail.value?.id}/related/${rb.key}/${row.id}`,
-      method: 'patch',
-      data: { fields: { sync_ifreight_checkbox: 1 } },
+    const res = await request<any>({
+      url: `/weida/domestic_ops/ifreight/${row.id}/sync-ifreight`,
+      method: 'post',
     })
-    ElMessage.success('已触发同步')
+    const result = res.data?.data || {}
+    if (result.status === '成功') {
+      ElMessage.success(result.bl_no ? `同步成功，分单号 ${result.bl_no}` : '同步成功')
+    } else {
+      ElMessage.error(`同步失败：${result.reason || '未知原因'}`)
+    }
     if (detail.value) await loadRelatedBlocks(detail.value.id)
   } catch (e: any) {
     ElMessage.error(e?.message || '同步失败')

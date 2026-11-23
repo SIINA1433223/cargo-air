@@ -761,6 +761,21 @@ async def arrival_report(order_id: int) -> Any:
     )
 
 
+@WeidaRouter.post(
+    "/domestic_ops/ifreight/{ifreight_id}/sync-ifreight",
+    summary="同步到 iFreight（SaveAirBooking，Java 引擎契约）",
+)
+async def sync_ifreight_route(ifreight_id: int) -> Any:
+    from .ifreight_sync_client import sync_ifreight
+
+    try:
+        result = await sync_ifreight(ifreight_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    msg = "同步成功" if result.get("status") == "成功" else f"同步失败：{result.get('reason') or ''}"
+    return SuccessResponse(data=result, msg=msg)
+
+
 @WeidaRouter.get(
     "/domestic_ops/orders/{order_id}/doc",
     summary="生成单据（主单/分单/舱单/booking/到货预报表）",
