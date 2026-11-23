@@ -1524,7 +1524,9 @@ async def _status_map(session: AsyncSession, wb: WorkbenchDef, rows: list[Any]) 
         )).all()
     }
     flags = {}
-    for oid, priced, booked, handed in (await session.execute(
+    # 注意列顺序：route_priced, handover, booked —— 之前按 (priced, booked, handed) 解包，
+    # 把「交接」当成了「订舱」、「订舱」当成了「交接」，导致没人显示「完成操作交接」。
+    for oid, priced, handed, booked in (await session.execute(
         text(
             "SELECT l.from_id, o.route_priced, o.handover_domestic_operation, "
             "EXISTS(SELECT 1 FROM biz_attachment a WHERE a.owner_table='order' "

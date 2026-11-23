@@ -191,57 +191,77 @@ async def labels(session, table: str) -> dict[str, str]:
     return {str(label): col for col, label in rows}
 
 
-# 飞书关联字段 → biz_link 行（妙搭那边「商机↔订单」这些关联全靠它，只写文本列不够）
+# 关联字段要落成**本地 id** 而不是名字的列（商机的「最终对客方案」）
+LINK_ID_COLUMNS = {
+    ("biz_opportunity", "最终对客方案"): ("biz_plan", "final_plan_id"),
+}
+
+
+LINK_TABLES = {
+    "opportunity": "biz_opportunity",
+    "order": "biz_order",
+    "pricing": "biz_pricing",
+    "plan": "biz_plan",
+    "ifreight": "biz_ifreight",
+    "vendor": "biz_vendor",
+}
+
+# 飞书关联字段 → biz_link 行（妙搭那边「商机↔订单」这些关联全靠它，只写文本列不够）。
+# value = (from_key, to_key, link_field)：**from/to 用的是 biz_link 里的表键**
+# （opportunity / order / pricing / plan / ifreight），不是本地表名；
+# 订单表的「关联商机」按 canonical 落成 商机→订单（field=订单表），与页面查询同一方向。
 LINK_PAIRS = {
-    ("biz_order", "关联商机"): ("biz_opportunity", "订单表"),
-    ("biz_ifreight", "所属订单"): ("biz_order", "所属订单"),
-    ("biz_opportunity", "航线报价"): ("biz_pricing", "航线报价"),
-    ("biz_opportunity", "对客方案"): ("biz_plan", "对客方案"),
-    ("biz_pricing", "关联商机"): ("biz_opportunity", "关联商机"),
-    ("biz_plan", "关联商机"): ("biz_opportunity", "关联商机"),
-    ("biz_plan", "航线报价"): ("biz_pricing", "航线报价"),
+    ("biz_order", "关联商机"): ("opportunity", "order", "订单表"),
+    ("biz_ifreight", "所属订单"): ("order", "ifreight", "所属订单"),
+    ("biz_opportunity", "航线报价"): ("opportunity", "pricing", "航线报价"),
+    ("biz_opportunity", "对客方案"): ("opportunity", "plan", "对客方案"),
+    ("biz_pricing", "关联商机"): ("pricing", "opportunity", "关联商机"),
+    ("biz_plan", "关联商机"): ("plan", "opportunity", "关联商机"),
+    ("biz_plan", "航线报价"): ("plan", "pricing", "航线报价"),
 }
 
 
 async def sync_links(session, local: str, items: list[dict[str, Any]]) -> int:
-    """按飞书关联字段把 biz_link 补齐（幂等，只增不删）。"""
-    pairs = {f: t for (tbl, f), t in LINK_PAIRS.items() if tbl == local}
+    """按飞书关联字段把 biz_link 补齐（幂等，只增不删，方向按 canonical）。"""
+    pairs = {f: spec for (tbl, f), spec in LINK_PAIRS.items() if tbl == local}
     if not pairs:
         return 0
-    wanted: list[tuple[str, str, str]] = []  # (local_id, target_table, target_id)
+
+    async def local_id(table: str, feishu_id: str) -> int | None:
+        return (
+            await session.execute(
+                text(f"SELECT id FROM `{table}` WHERE feishu_record_id=:r"),
+                {"r": feishu_id},
+            )
+        ).scalar()
+
+    written = 0
     for item in items:
         rid = str(item.get("record_id") or "")
         if not rid:
             continue
-        src = (
-            await session.execute(
-                text(f"SELECT id FROM `{local}` WHERE feishu_record_id=:r"), {"r": rid}
-            )
-        ).scalar()
-        if not src:
+        me = await local_id(local, rid)
+        if not me:
             continue
-        for field, (target, link_field) in pairs.items():
+        for field, (from_key, to_key, link_field) in pairs.items():
             raw = item.get("fields", {}).get(field)
             ids = raw.get("link_record_ids") if isinstance(raw, dict) else None
-            for to_fid in ids or []:
-                dst = (
-                    await session.execute(
-                        text(f"SELECT id FROM `{target}` WHERE feishu_record_id=:r"),
-                        {"r": str(to_fid)},
-                    )
-                ).scalar()
-                if dst:
-                    wanted.append((str(src), target, str(dst), link_field))
-    written = 0
-    for src, target, dst, link_field in wanted:
-        await session.execute(
-            text(
-                "INSERT INTO biz_link (field, from_table, from_id, to_table, to_id) "
-                "VALUES (:f, :ft, :fid, :tt, :tid) ON DUPLICATE KEY UPDATE id = id"
-            ),
-            {"f": link_field, "ft": local, "fid": src, "tt": target, "tid": dst},
-        )
-        written += 1
+            from_table = LINK_TABLES[from_key]
+            to_table = LINK_TABLES[to_key]
+            other_table = to_table if from_table == local else from_table
+            for other_fid in ids or []:
+                other = await local_id(other_table, str(other_fid))
+                if not other:
+                    continue
+                src, dst = (me, other) if from_table == local else (other, me)
+                await session.execute(
+                    text(
+                        "INSERT INTO biz_link (field, from_table, from_id, to_table, to_id) "
+                        "VALUES (:f, :ft, :fid, :tt, :tid) ON DUPLICATE KEY UPDATE id = id"
+                    ),
+                    {"f": link_field, "ft": from_key, "fid": src, "tt": to_key, "tid": dst},
+                )
+                written += 1
     return written
 
 
@@ -290,6 +310,18 @@ async def sync_table(
                 if column == "chargeable_weight":
                     continue
                 raw = item.get("fields", {}).get(field)
+                id_col = LINK_ID_COLUMNS.get((local, field))
+                if id_col and isinstance(raw, dict) and raw.get("link_record_ids"):
+                    target_table, target_col = id_col
+                    values[target_col] = (
+                        await session.execute(
+                            text(
+                                f"SELECT id FROM `{target_table}` WHERE feishu_record_id=:r"
+                            ),
+                            {"r": str(raw["link_record_ids"][0])},
+                        )
+                    ).scalar()
+                    continue
                 resolver = LINK_FIELDS.get((local, field))
                 if isinstance(raw, dict) and raw.get("link_record_ids") and resolver:
                     target, target_col = resolver
@@ -375,6 +407,47 @@ async def sync_table(
     return {"table": name, "local": local, "feishu": len(items), "inserted": inserted, "updated": updated, "deleted": deleted, "links": links, "mapped": len(mapping) - 1}
 
 
+
+
+
+async def cleanup_dangling_links() -> int:
+    """prune 之后：清掉方向写反的旧关联 + 指向已删记录的关联行。"""
+    removed = 0
+    async with async_db_session() as session:
+        # 上一版把「本地表名」当成关联键写成 from_table='biz_opportunity' 这类脏行，清掉
+        result = await session.execute(
+            text(
+                "DELETE FROM biz_link WHERE from_table NOT IN "
+                "('opportunity','order','pricing','plan','ifreight','vendor') "
+                "OR to_table NOT IN ('opportunity','order','pricing','plan','ifreight','vendor')"
+            )
+        )
+        removed += result.rowcount or 0
+        for from_t, to_t, field in (
+            ("biz_order", "biz_opportunity", "订单表"),
+            ("biz_ifreight", "biz_order", "所属订单"),
+        ):
+            result = await session.execute(
+                text(
+                    "DELETE FROM biz_link WHERE from_table=:f AND to_table=:t AND field=:k"
+                ),
+                {"f": from_t, "t": to_t, "k": field},
+            )
+            removed += result.rowcount or 0
+        for key, table in LINK_TABLES.items():
+            for side, col in (("from", "from_id"), ("to", "to_id")):
+                result = await session.execute(
+                    text(
+                        f"DELETE l FROM biz_link l WHERE l.{side}_table = :k "
+                        f"AND NOT EXISTS (SELECT 1 FROM `{table}` x WHERE x.id = l.{col})"
+                    ),
+                    {"k": key},
+                )
+                removed += result.rowcount or 0
+        await session.commit()
+    return removed
+
+
 async def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--prune", action="store_true")
@@ -408,6 +481,9 @@ async def main() -> None:
             report.append(result)
         except Exception as exc:
             print(json.dumps({"table": name, "error": type(exc).__name__ + ": " + str(exc)[:300]}, ensure_ascii=False))
+    if args.prune:
+        dangling = await cleanup_dangling_links()
+        print(json.dumps({"dangling_links_removed": dangling}, ensure_ascii=False))
     print(json.dumps({"at": datetime.now().isoformat(timespec="seconds"), "tables": len(report)}, ensure_ascii=False))
 
 
