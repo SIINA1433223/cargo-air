@@ -558,7 +558,7 @@
                     <a class="wb-attach-link" @click="downloadAttachment(a)">{{ a.file_name }}</a>
                     <el-button link type="danger" size="small" @click="removeDetailAttachment(a, '确认账单文件')">删除</el-button>
                   </div>
-                  <el-upload :show-file-list="false" :http-request="(opt: any) => uploadDetailAttachment('确认账单文件', opt)">
+                  <el-upload multiple :show-file-list="false" @click.stop="activeAttachField = '确认账单文件'" :http-request="(opt: any) => uploadDetailAttachment('确认账单文件', opt)">
                     <el-button size="small">上传</el-button>
                   </el-upload>
                 </div>
@@ -579,7 +579,7 @@
                     <a class="wb-attach-link" @click="downloadAttachment(a)">{{ a.file_name }}</a>
                     <el-button link type="danger" size="small" @click="removeDetailAttachment(a, '发票')">删除</el-button>
                   </div>
-                  <el-upload :show-file-list="false" :http-request="(opt: any) => uploadDetailAttachment('发票', opt)">
+                  <el-upload multiple :show-file-list="false" @click.stop="activeAttachField = '发票'" :http-request="(opt: any) => uploadDetailAttachment('发票', opt)">
                     <el-button size="small">上传</el-button>
                   </el-upload>
                 </div>
@@ -671,7 +671,9 @@
                       <el-button link type="danger" size="small" @click="removeDetailAttachment(a, grp.label === '头程' ? '头程入货通知' : '二程入货通知')">删除</el-button>
                     </div>
                     <el-upload
+                      multiple
                       :show-file-list="false"
+                      @click.stop="activeAttachField = grp.label === '头程' ? '头程入货通知' : '二程入货通知'"
                       :http-request="(opt: any) => uploadDetailAttachment(grp.label === '头程' ? '头程入货通知' : '二程入货通知', opt)">
                       <el-button size="small">上传附件</el-button>
                     </el-upload>
@@ -780,7 +782,9 @@
                     <el-button link type="danger" size="small" @click="removeDetailAttachment(a, mailField)">删除</el-button>
                   </div>
                   <el-upload
+                      multiple
                     :show-file-list="false"
+                    @click.stop="activeAttachField = mailField"
                     :http-request="(opt: any) => uploadDetailAttachment(mailField, opt)">
                     <el-button size="small">上传附件</el-button>
                   </el-upload>
@@ -795,7 +799,9 @@
                       <el-button link type="danger" size="small" @click="removeDetailAttachment(a, docField)">删除</el-button>
                     </div>
                     <el-upload
+                      multiple
                       :show-file-list="false"
+                      @click.stop="activeAttachField = docField"
                       :http-request="(opt: any) => uploadDetailAttachment(docField, opt)">
                       <el-button size="small">上传附件</el-button>
                     </el-upload>
@@ -1139,6 +1145,7 @@
                     </el-button>
                   </div>
                   <el-upload
+                      multiple
                     :show-file-list="false"
                     :http-request="(opt: any) => uploadOrderAttachment(relatedOrders[0], opt)"
                     accept=".xlsx,.xls,.pdf,.png,.jpg,.jpeg">
@@ -1161,6 +1168,7 @@
                         @click="removeOrderExtraAttachment(a, relatedOrders[0].id, field)">删除</el-button>
                     </div>
                     <el-upload
+                      multiple
                       :show-file-list="false"
                       :http-request="(opt: any) => uploadOrderExtraAttachment(relatedOrders[0].id, field, opt)">
                       <el-button size="small">上传附件</el-button>
@@ -1281,6 +1289,7 @@
                         <el-button link type="danger" size="small" @click="removeAttachment(a)">删除</el-button>
                       </div>
                       <el-upload
+                      multiple
                         :show-file-list="false"
                         :http-request="(opt: any) => uploadAttachment(row, opt)"
                         accept=".xlsx,.xls,.pdf,.png,.jpg,.jpeg">
@@ -1601,6 +1610,7 @@
                     <div class="wb-ops-field">
                       <span class="wb-ops-label">委托书</span>
                       <el-upload
+                      multiple
                         :show-file-list="false"
                         :http-request="(opt: any) => uploadIfreightAttachment(row, '委托书', opt)">
                         <el-button size="small">{{ row.fields['委托书']?.value ? '重新上传' : '上传委托书' }}</el-button>
@@ -7534,6 +7544,19 @@ watch(
   }
 )
 
+// 附件：记住最后一次点击的附件格，Ctrl+V 粘图片/文件就传到这一格
+const activeAttachField = ref('')
+
+async function onGlobalPaste(event: ClipboardEvent) {
+  if (!drawerOpen.value || !activeAttachField.value) return
+  const files = Array.from(event.clipboardData?.files || [])
+  if (!files.length) return
+  event.preventDefault()
+  for (const file of files) {
+    await uploadDetailAttachment(activeAttachField.value, { file, onSuccess: () => {}, onError: () => {} })
+  }
+}
+
 onMounted(async () => {
   if (role.value === 'master-data') return
   if (isDashboard.value) {
@@ -7549,9 +7572,13 @@ onMounted(async () => {
   void loadStaffOptions()
   bindTableScroll()
   connectEvents()
+  document.addEventListener('paste', onGlobalPaste)
 })
 
-onUnmounted(disconnectEvents)
+onUnmounted(() => {
+  disconnectEvents()
+  document.removeEventListener('paste', onGlobalPaste)
+})
 </script>
 
 <style scoped>
