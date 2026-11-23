@@ -238,7 +238,7 @@
               <template v-else-if="column.key === '__status'">
                 <div
                   class="wb-status-cell"
-                  :class="{ 'wb-alert-flashing': record.alerts?.some((a: any) => a.severity === 'critical') }"
+                  :class="{ 'wb-alert-flashing': activeAlerts(record).some((a: any) => a.severity === 'critical') }"
                   @click="openAlerts(record)">
                   <span
                     v-if="record.fields.single_status?.value"
@@ -252,9 +252,9 @@
                   <span v-else class="cell-empty">—</span>
                   <!-- 整格可点：点状态格任意处都弹「这票的提醒」对话框（与妙搭一致） -->
                   <span
-                    v-if="record.alerts?.length"
+                    v-if="activeAlerts(record).length"
                     class="wb-alert-dot"
-                    :class="record.alerts[0].severity === 'critical' ? 'is-critical' : 'is-warning'">
+                    :class="activeAlerts(record)[0].severity === 'critical' ? 'is-critical' : 'is-warning'">
                     !
                   </span>
                   <!-- 客服：账单「客人未确认」在单票状态格里画黄叹号（妙搭 billStatus.alertStep） -->
@@ -1745,11 +1745,11 @@
       </a-drawer>
     </template>
 
-    <el-dialog v-model="alertDialogOpen" :title="`这票的提醒（${alertDialogRecord?.alerts?.length || 0}）`" width="480px">
+    <el-dialog v-model="alertDialogOpen" :title="`这票的提醒（${activeAlerts(alertDialogRecord).length}）`" width="480px">
       <div class="wb-alert-panel">
         <div class="wb-alert-hint">点「取消提醒」只关掉这一条，数据再变会重新提醒；能当场补的可以直接执行。</div>
         <div
-          v-for="a in alertDialogRecord?.alerts || []"
+          v-for="a in activeAlerts(alertDialogRecord)"
           :key="a.title + a.detail"
           class="wb-alert-item"
           :class="a.severity">
@@ -1768,7 +1768,7 @@
               {{ a.action.label }}
             </el-button>
             <el-button
-              v-if="alertDialogRecord?.alerts?.some((x: any) => x.title === '客人未确认账单') && a.title === '客人未确认账单'"
+              v-if="activeAlerts(alertDialogRecord).some((x: any) => x.title === '客人未确认账单') && a.title === '客人未确认账单'"
               size="small"
               @click.stop="markBillConfirmed(alertDialogRecord)">
               标记已确认
@@ -5433,8 +5433,19 @@ function isAlertDismissed(orderId: number, alert: any) {
   return Boolean(dismissedAlerts()[alertKey(orderId, alert)])
 }
 
+/** 屏幕上该显示的提醒：去掉本机已取消的（硬刷新同样生效）。 */
+function activeAlerts(record: Row | null | undefined): any[] {
+  if (!record) return []
+  return (record.alerts || []).filter((a: any) => !isAlertDismissed(Number(record.id), a))
+}
+
 function dismissAlert(record: Row, alert: any) {
   const all = dismissedAlerts()
+  // 只保留最近 30 天的取消记录，避免 localStorage 越积越多
+  const cutoff = Date.now() - 30 * 86_400_000
+  for (const [key, at] of Object.entries(all)) {
+    if (Number(at) < cutoff) delete all[key]
+  }
   all[alertKey(Number(record.id), alert)] = Date.now()
   localStorage.setItem('weida_alert_dismissed_v1', JSON.stringify(all))
   record.alerts = (record.alerts || []).filter((a: any) => alertKey(Number(record.id), a) !== alertKey(Number(record.id), alert))
