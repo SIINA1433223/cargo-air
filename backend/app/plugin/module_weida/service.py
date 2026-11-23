@@ -1751,19 +1751,35 @@ async def get_record(wb: WorkbenchDef, record_id: int) -> dict[str, Any] | None:
     return None
 
 
-def _num_text(value: Any) -> str:
-    """数字写成文本时去掉多余的 .0（与 Java `BitableRecords.plain` 一致）。"""
-    if value is None or value == "":
-        return ""
-    try:
-        num = float(value)
-    except (TypeError, ValueError):
-        return str(value)
-    return str(int(num)) if num == int(num) else f"{num:g}"
+def _plain_text(value: Any) -> str | None:
+    """把关联/查找引用读回来的各种形状压成纯文本名（`["xx"]`、`[{"name":..}]`、JSON 串）。
+
+    客户 / 供应商 / 国外代理在飞书上是关联字段，不同接口回来的包装层不一样；订单表这
+    三列存的是客商名称，界面按客商档案的下拉选，所以这里只留名字本身。
+    """
+    if value in (None, ""):
+        return None
+    if isinstance(value, str):
+        raw = value.strip()
+        if raw.startswith("[") or raw.startswith("{"):
+            try:
+                return _plain_text(json.loads(raw))
+            except (TypeError, ValueError):
+                return raw or None
+        return raw or None
+    if isinstance(value, dict):
+        for key in ("name", "text", "value"):
+            if key in value:
+                return _plain_text(value[key])
+        return None
+    if isinstance(value, (list, tuple)):
+        names = [p for p in (_plain_text(item) for item in value) if p]
+        return ",".join(names) if names else None
+    return str(value)
 
 
-def _cargo_text(opp: Any) -> str:
-    """订单「货物数据」：`件数/毛重/体积`，换行接尺寸；毛重或体积缺了就不拼。"""
+def _order_cargo_text(opp: Any) -> str:
+    """订单「货物数据」：`件数/毛重/体积`，换行接尺寸；毛重或体积缺了就不拼（Java 口径）。"""
     if opp.get("gross_weight_kg") in (None, "") or opp.get("volume_m3") in (None, ""):
         return ""
     cargo = "/".join(
@@ -1851,15 +1867,17 @@ async def _ensure_order(session: AsyncSession, opp: Any) -> int | None:
     #   货好时间 ← 商机「货好时间」（只到日）
     #   起运地/目的地/航班/供应商/等级、比例要求/成本金额/成本币种 ← 最终方案的航线报价
     #   国内操作 不自动分配（与 Java 一致，留空由业务填）
-    goods = _cargo_text(opp)
+    goods = _order_cargo_text(opp)
     result = await session.execute(
         text(
             "INSERT INTO biz_order "
-            "(client_ref_no, opportunity_no, plan_no, airline, cost_amount, cost_currency, "
+            "(client_ref_no, opportunity_no, plan_no, customer_name, foreign_agent_name, "
+            " airline, cost_amount, cost_currency, "
             " level_ratio_req, customer_core_concern, goods_special_attr, supplier, "
             " departure_location, destination, flight, goods_data, goods_name_special_attr, "
             " goods_ready_time, create_booking) "
-            "VALUES (:client_ref, :opportunity_no, :plan_no, :airline, :cost, :currency, :level, "
+            "VALUES (:client_ref, :opportunity_no, :plan_no, :customer, :foreign_agent, "
+            " :airline, :cost, :currency, :level, "
             " :concern, :special, :supplier, :departure, :destination, :flight, :goods, :goods_name, "
             " :goods_ready, 0)"
         ),
@@ -1867,13 +1885,16 @@ async def _ensure_order(session: AsyncSession, opp: Any) -> int | None:
             "client_ref": opp.get("client_ref_no"),
             "opportunity_no": opp.get("opportunity_no"),
             "plan_no": plan_no,
+            # 客户 / 国外代理来自客服那条商机记录（都是客商档案里的枚举名，界面按选项选）
+            "customer": _plain_text(opp.get("customer_name")),
+            "foreign_agent": _plain_text(opp.get("foreign_agent_name")),
             "airline": (pricing or {}).get("airline"),
             "cost": (pricing or {}).get("cost_amount"),
             "currency": (pricing or {}).get("cost_currency"),
             "level": (pricing or {}).get("level_ratio_requirement"),
             "concern": opp.get("customer_core_concern"),
             "special": opp.get("goods_special_attr"),
-            "supplier": (pricing or {}).get("supplier"),
+            "supplier": _plain_text((pricing or {}).get("supplier")) or _plain_text(opp.get("supplier")),
             "departure": (pricing or {}).get("departure_port"),
             "destination": (pricing or {}).get("destination_port"),
             "flight": (pricing or {}).get("earliest_flight_time"),
