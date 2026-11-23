@@ -57,6 +57,8 @@ LINK_FIELDS = {
     # iFreight 上的这两个是单向关联（客商档案），本地存的是名字
     ("biz_ifreight", "国外代理"): ("vendor", "merchant_short_name"),
     ("biz_ifreight", "订舱代理"): ("vendor", "merchant_short_name"),
+    # 报价表的供应商同理（关联客商档案，本地存简称）
+    ("biz_pricing", "供应商"): ("vendor", "merchant_short_name"),
 }
 
 ALIASES: dict[str, dict[str, str]] = {
