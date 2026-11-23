@@ -2733,7 +2733,7 @@ const tableZoom = ref(100)
 
 // 缩放后表格内部可用高度要换算回「未缩放」的 px，否则缩小只留白、不多显示行
 const tableScrollY = computed(
-  () => `calc((100vh - 205px) * ${(100 / tableZoom.value).toFixed(4)})`,
+  () => `calc((100vh - 168px) * ${(100 / tableZoom.value).toFixed(4)})`,
 )
 
 function saveTableZoom() {
