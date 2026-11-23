@@ -343,6 +343,7 @@ import {
   ElButton,
   ElCard,
   ElColorPicker,
+  ElDialog,
   ElEmpty,
   ElInput,
   ElMessage,
