@@ -1751,8 +1751,46 @@ async def get_record(wb: WorkbenchDef, record_id: int) -> dict[str, Any] | None:
     return None
 
 
+def _num_text(value: Any) -> str:
+    """数字写成文本时去掉多余的 .0（与 Java `BitableRecords.plain` 一致）。"""
+    if value is None or value == "":
+        return ""
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    return str(int(num)) if num == int(num) else f"{num:g}"
+
+
+def _cargo_text(opp: Any) -> str:
+    """订单「货物数据」：`件数/毛重/体积`，换行接尺寸；毛重或体积缺了就不拼。"""
+    if opp.get("gross_weight_kg") in (None, "") or opp.get("volume_m3") in (None, ""):
+        return ""
+    cargo = "/".join(
+        (
+            _num_text(opp.get("piece_count")),
+            _num_text(opp.get("gross_weight_kg")),
+            _num_text(opp.get("volume_m3")),
+        )
+    )
+    size = str(opp.get("size_length_width_height_quantity") or "").strip()
+    return f"{cargo}\n{size}" if size else cargo
+
+
+def _date_part(value: Any) -> str | None:
+    """日期只到日（商机「货好时间」→ 订单日期列的上海当天 0 点）。"""
+    if value in (None, ""):
+        return None
+    return str(value)[:10]
+
+
 async def _ensure_order(session: AsyncSession, opp: Any) -> int | None:
-    """确认拿到货时，按商机生成一条订仓单（幂等）；有最终方案则带上方案信息。"""
+    """确认拿到货时按商机生成一条订单（幂等），字段映射照 Java 引擎的「确认订单」契约。
+
+    数据来源：商机本体 + 商机「最终对客方案」→ 方案关联的那条航线报价。
+    首次方案/报价都不存在时仍然建单（只带商机这一半），不阻断业务 —— Java 那边会
+    直接报错「商机必须关联一条最终对客方案」，这里有最终方案才抄报价那几列。
+    """
     existing = (
         await session.execute(
             text(
@@ -1807,17 +1845,23 @@ async def _ensure_order(session: AsyncSession, opp: Any) -> int | None:
                     {"id": plan["pricing_id"]},
                 )
             ).mappings().first()
-    goods = f"{opp.get('piece_count') or ''}/{opp.get('gross_weight_kg') or ''}/{opp.get('volume_m3') or ''}"
-    if opp.get("size_length_width_height_quantity"):
-        goods += "\n" + str(opp["size_length_width_height_quantity"])
+    # 字段映射照 Java 引擎（wfs）的「确认订单」契约（OrderConfirmReader#assemble）：
+    #   货物数据 = 件数/毛重/体积（缺一项就不拼）+ 换行 + 尺寸
+    #   货物品名（货物特殊属性）← 商机「货物品名(货物特殊属性)」
+    #   货好时间 ← 商机「货好时间」（只到日）
+    #   起运地/目的地/航班/供应商/等级、比例要求/成本金额/成本币种 ← 最终方案的航线报价
+    #   国内操作 不自动分配（与 Java 一致，留空由业务填）
+    goods = _cargo_text(opp)
     result = await session.execute(
         text(
             "INSERT INTO biz_order "
             "(client_ref_no, opportunity_no, plan_no, airline, cost_amount, cost_currency, "
-            " level_ratio_req, operation_requirement, special_note, supplier, departure_location, "
-            " destination, flight, goods_data, goods_name_special_attr, create_booking) "
+            " level_ratio_req, customer_core_concern, goods_special_attr, supplier, "
+            " departure_location, destination, flight, goods_data, goods_name_special_attr, "
+            " goods_ready_time, create_booking) "
             "VALUES (:client_ref, :opportunity_no, :plan_no, :airline, :cost, :currency, :level, "
-            " :operation, :note, :supplier, :departure, :destination, :flight, :goods, :goods_name, 0)"
+            " :concern, :special, :supplier, :departure, :destination, :flight, :goods, :goods_name, "
+            " :goods_ready, 0)"
         ),
         {
             "client_ref": opp.get("client_ref_no"),
@@ -1827,14 +1871,15 @@ async def _ensure_order(session: AsyncSession, opp: Any) -> int | None:
             "cost": (pricing or {}).get("cost_amount"),
             "currency": (pricing or {}).get("cost_currency"),
             "level": (pricing or {}).get("level_ratio_requirement"),
-            "operation": opp.get("customer_core_concern"),
-            "note": opp.get("remark"),
+            "concern": opp.get("customer_core_concern"),
+            "special": opp.get("goods_special_attr"),
             "supplier": (pricing or {}).get("supplier"),
             "departure": (pricing or {}).get("departure_port"),
             "destination": (pricing or {}).get("destination_port"),
             "flight": (pricing or {}).get("earliest_flight_time"),
             "goods": goods,
-            "goods_name": opp.get("goods_name"),
+            "goods_name": opp.get("goods_name_special_attr"),
+            "goods_ready": _date_part(opp.get("goods_ready_time")),
         },
     )
     order_id = int(result.lastrowid)
@@ -2082,8 +2127,19 @@ async def create_record(
         result = await session.execute(
             text(f"INSERT INTO `{wb.table}` ({cols}) VALUES ({vals})"), params
         )
-        await session.commit()
         record_id = int(result.lastrowid or 0)
+        # 与 Java 引擎「确认订单」同一规则：商机新建时就是「是否拿到货=是」的，
+        # 当场建订单（订单表即操作工作台的数据来源），不然这票永远不会进操作那边。
+        if wb.table == "biz_opportunity" and payload.get("is_goods_received") == "是":
+            current = (
+                await session.execute(
+                    text("SELECT * FROM biz_opportunity WHERE id = :id"),
+                    {"id": record_id},
+                )
+            ).mappings().first()
+            if current:
+                await _ensure_order(session, current)
+        await session.commit()
     await publish_event(
         table=wb.table,
         record_id=record_id,
