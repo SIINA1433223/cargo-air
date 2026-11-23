@@ -2958,7 +2958,20 @@ function sortBy(column: string) {
 const antColumns = computed<any[]>(() => {
   const cols: any[] = [
     { title: '#', key: '__index', width: 32, align: 'center' },
-    { title: role.value === 'pricing' ? '航线状态' : '单票状态', key: '__status', width: 128, fixed: 'left' },
+    {
+      title: role.value === 'pricing' ? '航线状态' : '单票状态',
+      key: '__status',
+      width: columnWidths.value.__status || 128,
+      fixed: 'left',
+      customHeaderCell: () => ({
+        onMousedown: (event: MouseEvent) => {
+          const target = event.currentTarget as HTMLElement
+          if (target && target.getBoundingClientRect().right - event.clientX <= 8) {
+            startColumnResize(event, '__status')
+          }
+        },
+      }),
+    },
   ]
   // 「查看」列紧挨着常驻状态列（妙搭 detailColumn 置顶），且不依赖账单状态列
   if (role.value === 'domestic_ops') {
