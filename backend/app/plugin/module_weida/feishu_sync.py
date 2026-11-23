@@ -173,9 +173,11 @@ def conv(value: Any) -> Any:
         if isinstance(value, dict):
             nested = value.get("value")
             if isinstance(nested, list):
-                return "".join(
-                    str(x.get("text") or "") if isinstance(x, dict) else str(x)
+                # 人员/查找引用回的每一项是 {name/avatar...}，只认 text 会整段变空
+                return ",".join(
+                    str(x.get("text") or x.get("name") or "") if isinstance(x, dict) else str(x)
                     for x in nested
+                    if (not isinstance(x, dict)) or x.get("text") or x.get("name")
                 )
             return str(value.get("text") or value.get("name") or "")
         return json.dumps(value, ensure_ascii=False)

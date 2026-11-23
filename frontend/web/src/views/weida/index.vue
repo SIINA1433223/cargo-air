@@ -1684,8 +1684,21 @@
                                 @change="(v: string) => saveRelatedField(rb, row, 'dimension', v)" />
                               <el-button size="small" @click="calcIfreightVolume(rb, row)">计算</el-button>
                             </div>
+                            <el-date-picker
+                              v-else-if="f.column === 'estimated_arrival_time'"
+                              :model-value="String(row.fields[f.column]?.value ?? '').slice(0, 10)"
+                              type="date"
+                              value-format="YYYY-MM-DD"
+                              size="small"
+                              style="width: 100%"
+                              @change="(v: string) => saveRelatedField(rb, row, 'estimated_arrival_time', v)" />
+                            <el-input
+                              v-else-if="f.column === 'master_no'"
+                              size="small"
+                              :model-value="row.fields.master_no?.value ?? ''"
+                              @change="(v: string) => saveMasterNo(rb, row, v)" />
                             <div
-                              v-else-if="['master_no','sync_status','sync_time','fail_reason','ai_recognize_result'].includes(f.column)">
+                              v-else-if="['sync_status','sync_time','fail_reason','ai_recognize_result'].includes(f.column)">
                               {{ display(row.fields[f.column]?.value, 'text') || '—' }}
                             </div>
                             <el-select
@@ -1759,7 +1772,12 @@
                   min-width="120">
                   <template #default="{ row }">
                     <el-input
-                      v-if="relatedColumnEditable(rb, c.column)"
+                      v-if="c.column === 'master_no'"
+                      :model-value="row.fields.master_no?.value ?? ''"
+                      size="small"
+                      @change="(v: string) => saveMasterNo(rb, row, v)" />
+                    <el-input
+                      v-else-if="relatedColumnEditable(rb, c.column)"
                       :model-value="row.fields[c.column]?.value ?? ''"
                       size="small"
                       @change="(v: string) => saveRelatedField(rb, row, c.column, v)" />
@@ -6855,6 +6873,25 @@ async function calcIfreightVolume(rb: RelatedBlock, row: RelatedRow) {
   await saveRelatedField(rb, row, 'volume_weight', String(weight))
   await saveRelatedField(rb, row, 'customer_billing_weight', String(billing))
   ElMessage.success(`体积 ${parsed.volume} m³，客户计费重 ${billing} kg`)
+}
+
+async function saveMasterNo(rb: RelatedBlock, row: RelatedRow, value: string) {
+  if (!detail.value) return
+  try {
+    // 主单号真身在订单表（iFreight 上是查找引用），改订单后把这一票所有分单行一起换掉
+    await request({
+      url: `/weida/${role.value}/records/${detail.value.id}`,
+      method: 'patch',
+      data: { fields: { master_no: value } },
+    })
+    detail.value.fields.master_no = { label: '主单号', value }
+    for (const item of relatedData[rb.key] || []) {
+      item.fields.master_no = { label: '主单号', value }
+    }
+    ElMessage.success('已保存')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '保存失败')
+  }
 }
 
 async function saveOrderField(column: string, value: string) {
