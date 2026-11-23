@@ -37,16 +37,16 @@ TARGETS = ["biz_order", "biz_ifreight", "biz_plan", "biz_pricing"]
 
 def _download(token: str, table_id: str, field_id: str, record_id: str, file_token: str) -> bytes:
     # 与 Java 引擎一致：bitablePerm 里要带 字段→记录→token 的授权结构
-    extra = base64.b64encode(
-        json.dumps(
-            {
-                "bitablePerm": {
-                    "tableId": table_id,
-                    "attachments": {field_id: {record_id: [file_token]}},
-                }
+    # Java 引擎是把 JSON 直接 urlencode（不是 base64）
+    extra = json.dumps(
+        {
+            "bitablePerm": {
+                "tableId": table_id,
+                "attachments": {field_id: {record_id: [file_token]}},
             }
-        ).encode()
-    ).decode()
+        },
+        separators=(",", ":"),
+    )
     url = (
         f"{fs.API}/drive/v1/medias/{urllib.parse.quote(file_token)}/download"
         f"?extra={urllib.parse.quote(extra)}"
