@@ -835,6 +835,23 @@ async def ref_options_sync_route() -> Any:
 
 
 @WeidaRouter.post(
+    "/domestic_ops/orders/{order_id}/action-mail",
+    summary="发送预报/报关/发货到计划邮件（Java 引擎模板）",
+)
+async def action_mail_route(
+    order_id: int,
+    kind: Annotated[str, Query()] = "prealert",
+) -> Any:
+    from .action_mails import send_action_mail
+
+    try:
+        result = await send_action_mail(order_id, kind)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return SuccessResponse(data=result, msg=f"邮件已发送到 {result['to']}")
+
+
+@WeidaRouter.post(
     "/domestic_ops/orders/{order_id}/second-leg-mail",
     summary="二程提货邮件（先达同步或发信）",
 )

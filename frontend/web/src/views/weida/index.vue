@@ -6992,8 +6992,31 @@ async function runAction(field: string) {
   try {
     const mailKinds: Record<string, string> = {
       send_pickup_email: 'pickup',
-      send_forecast: 'forecast',
       invoice_issuance: 'invoice',
+    }
+    // 预报 / 报关 / 发货到计划：Java 引擎那三封信（模板与取数口径一致）
+    const javaMailKinds: Record<string, string> = {
+      send_forecast: 'prealert',
+      customs_declaration: 'customs',
+      issue_operation_plan: 'operation_plan',
+    }
+    if (javaMailKinds[field] && role.value === 'domestic_ops' && detail.value) {
+      const res = await request<any>({
+        url: `/weida/domestic_ops/orders/${detail.value.id}/action-mail`,
+        method: 'post',
+        params: { kind: javaMailKinds[field] },
+      })
+      const fresh = await request<any>({
+        url: `/weida/${role.value}/records/${detail.value.id}`,
+        method: 'get',
+      })
+      if (fresh.data?.data) {
+        detail.value = fresh.data.data
+        const index = rows.value.findIndex((r) => r.id === fresh.data.data.id)
+        if (index >= 0) rows.value[index] = fresh.data.data
+      }
+      ElMessage.success(res.data?.msg || '邮件已发送')
+      return
     }
     if (mailKinds[field] && role.value === 'domestic_ops' && detail.value) {
       const res = await request<any>({
