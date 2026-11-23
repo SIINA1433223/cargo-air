@@ -191,6 +191,60 @@ async def labels(session, table: str) -> dict[str, str]:
     return {str(label): col for col, label in rows}
 
 
+# 飞书关联字段 → biz_link 行（妙搭那边「商机↔订单」这些关联全靠它，只写文本列不够）
+LINK_PAIRS = {
+    ("biz_order", "关联商机"): ("biz_opportunity", "订单表"),
+    ("biz_ifreight", "所属订单"): ("biz_order", "所属订单"),
+    ("biz_opportunity", "航线报价"): ("biz_pricing", "航线报价"),
+    ("biz_opportunity", "对客方案"): ("biz_plan", "对客方案"),
+    ("biz_pricing", "关联商机"): ("biz_opportunity", "关联商机"),
+    ("biz_plan", "关联商机"): ("biz_opportunity", "关联商机"),
+    ("biz_plan", "航线报价"): ("biz_pricing", "航线报价"),
+}
+
+
+async def sync_links(session, local: str, items: list[dict[str, Any]]) -> int:
+    """按飞书关联字段把 biz_link 补齐（幂等，只增不删）。"""
+    pairs = {f: t for (tbl, f), t in LINK_PAIRS.items() if tbl == local}
+    if not pairs:
+        return 0
+    wanted: list[tuple[str, str, str]] = []  # (local_id, target_table, target_id)
+    for item in items:
+        rid = str(item.get("record_id") or "")
+        if not rid:
+            continue
+        src = (
+            await session.execute(
+                text(f"SELECT id FROM `{local}` WHERE feishu_record_id=:r"), {"r": rid}
+            )
+        ).scalar()
+        if not src:
+            continue
+        for field, (target, link_field) in pairs.items():
+            raw = item.get("fields", {}).get(field)
+            ids = raw.get("link_record_ids") if isinstance(raw, dict) else None
+            for to_fid in ids or []:
+                dst = (
+                    await session.execute(
+                        text(f"SELECT id FROM `{target}` WHERE feishu_record_id=:r"),
+                        {"r": str(to_fid)},
+                    )
+                ).scalar()
+                if dst:
+                    wanted.append((str(src), target, str(dst), link_field))
+    written = 0
+    for src, target, dst, link_field in wanted:
+        await session.execute(
+            text(
+                "INSERT INTO biz_link (field, from_table, from_id, to_table, to_id) "
+                "VALUES (:f, :ft, :fid, :tt, :tid) ON DUPLICATE KEY UPDATE id = id"
+            ),
+            {"f": link_field, "ft": local, "fid": src, "tt": target, "tid": dst},
+        )
+        written += 1
+    return written
+
+
 async def sync_table(
     tk: str,
     app: str,
@@ -308,6 +362,7 @@ async def sync_table(
                     values,
                 )
                 inserted += 1
+        links = await sync_links(session, local, items)
         if prune and "feishu_record_id" in cols:
             if seen:
                 stmt = text(
@@ -317,7 +372,7 @@ async def sync_table(
                 result = await session.execute(stmt, {"ids": tuple(seen)})
                 deleted = result.rowcount or 0
         await session.commit()
-    return {"table": name, "local": local, "feishu": len(items), "inserted": inserted, "updated": updated, "deleted": deleted, "mapped": len(mapping) - 1}
+    return {"table": name, "local": local, "feishu": len(items), "inserted": inserted, "updated": updated, "deleted": deleted, "links": links, "mapped": len(mapping) - 1}
 
 
 async def main() -> None:
