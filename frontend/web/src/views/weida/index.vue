@@ -1304,20 +1304,21 @@
                 <div class="wb-review-status">
                   <span>核价状态</span>
                   <el-tag :type="relatedOrders[0].fields.route_manager_priced?.value === '已核价' ? 'success' : 'warning'">
-                    {{ relatedOrders[0].fields.route_manager_priced?.value === '已核价' ? '已完成' : '待主管核价' }}
+                    {{ relatedOrders[0].fields.route_manager_priced?.value === '已核价' ? '已核价' : '待主管核价' }}
                   </el-tag>
                 </div>
                 <div class="wb-review-grid">
-                  <div><label>客户</label><span>{{ display(detail.fields.client_name?.value, 'text') }}</span></div>
-                  <div><label>风险提醒</label><span>{{ blockValue(relatedPricing[0], 'risk_reminder') || '—' }}</span></div>
-                  <div><label>航司</label><span>{{ blockValue(relatedPricing[0], 'airline') || '—' }}</span></div>
+                  <!-- 妙搭：航线核价读的是**订单表**那一行（多张订单各一行），不是报价表 -->
+                  <div><label>客户</label><span>{{ display(relatedOrders[0].fields.customer_name?.value, 'text') }}</span></div>
+                  <div><label>航司</label><span>{{ display(relatedOrders[0].fields.airline?.value, 'text') }}</span></div>
+                  <div><label>风险提醒</label><span>{{ display(relatedOrders[0].fields.risk_reminder?.value, 'text') }}</span></div>
+                  <div><label>成本金额</label><span>{{ display(relatedOrders[0].fields.cost_amount?.value, 'number') }}</span></div>
+                  <div><label>成本币种</label><span>{{ display(relatedOrders[0].fields.cost_currency?.value, 'text') }}</span></div>
+                  <div><label>供应商</label><span>{{ display(relatedOrders[0].fields.supplier?.value, 'text') }}</span></div>
+                  <div><label>起运地</label><span>{{ display(relatedOrders[0].fields.departure_location?.value, 'text') }}</span></div>
+                  <div><label>目的地</label><span>{{ display(relatedOrders[0].fields.destination?.value, 'text') }}</span></div>
+                  <div><label>等级、比例要求</label><span>{{ display(relatedOrders[0].fields.level_ratio_req?.value, 'text') }}</span></div>
                   <div><label>航线主管已核价</label><span>{{ relatedOrders[0].fields.route_manager_priced?.value || '—' }}</span></div>
-                  <div><label>等级、比例要求</label><span>{{ blockValue(relatedPricing[0], 'level_ratio_requirement') || '—' }}</span></div>
-                  <div><label>成本金额</label><span>{{ blockValue(relatedPricing[0], 'cost_amount') || '—' }}</span></div>
-                  <div><label>成本币种</label><span>{{ blockValue(relatedPricing[0], 'cost_currency') || '—' }}</span></div>
-                  <div><label>起运地</label><span>{{ blockValue(relatedPricing[0], 'departure_port') || '—' }}</span></div>
-                  <div><label>目的地</label><span>{{ blockValue(relatedPricing[0], 'destination_port') || '—' }}</span></div>
-                  <div><label>供应商</label><span>{{ blockValue(relatedPricing[0], 'supplier') || '—' }}</span></div>
                 </div>
               </div>
               <el-form v-if="block.key === 'plan'" label-position="top" class="wb-form wb-plan-footer">

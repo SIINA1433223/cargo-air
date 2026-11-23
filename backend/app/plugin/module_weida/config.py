@@ -132,9 +132,9 @@ WORKBENCHES: dict[str, WorkbenchDef] = {
                     "risk_reminder",
                     "route_plan_suggestion",
                     "create_time",
-                    "quotation_validity_period",
                 ),
                 columns=(
+                    "supplier_quote_info",
                     "customer_plan_draft",
                     "supplier",
                     "route_transit_point",
@@ -166,9 +166,9 @@ WORKBENCHES: dict[str, WorkbenchDef] = {
                 label="订仓单",
                 table="biz_order",
                 columns=(
-                    "client_ref_no",
                     "opportunity_no",
                     "plan_no",
+                    "client_ref_no",
                     "cost_amount",
                     "level_ratio_req",
                     "cost_currency",
