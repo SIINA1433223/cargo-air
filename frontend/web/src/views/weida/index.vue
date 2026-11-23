@@ -7006,6 +7006,14 @@ async function saveRelatedField(rb: RelatedBlock, row: RelatedRow, column: strin
       data: { fields: { [column]: value } },
     })
     row.fields[column] = { label: column, value }
+    // 同名字段在多个分 tag / 订单上都有：把本页改的值镜像过去，切页看到的是同一个值
+    if (['master_no', 'house_bl_no', 'customs_declaration_goods_name', 'goods_description', 'goods_data'].includes(column)) {
+      detail.value.fields[column] = { label: column, value }
+      editModel[column] = value
+      if (column === 'master_no') {
+        for (const item of relatedData[rb.key] || []) item.fields.master_no = { label: '主单号', value }
+      }
+    }
     if (
       rb.key === 'ifreight' &&
       ['quantity', 'gross_weight', 'volume', 'dimension', 'house_bl_no', 'volume_weight', 'customer_billing_weight'].includes(column) &&

@@ -2306,6 +2306,29 @@ async def update_record(
             ).first()
             if not has_ifreight:
                 need_ifreight = True
+        # 订单 ↔ iFreight 共用标识字段：在任一页改了，同一票所有分单行一起更新
+        if wb.table == "biz_order":
+            shared = {
+                key: payload[key]
+                for key in (
+                    "master_no",
+                    "house_bl_no",
+                    "customs_declaration_goods_name",
+                    "goods_description",
+                    "goods_data",
+                )
+                if key in payload
+            }
+            if shared:
+                sets = ", ".join(f"`{col}` = :{col}" for col in shared)
+                await session.execute(
+                    text(
+                        f"UPDATE biz_ifreight i JOIN biz_link l ON l.to_table='ifreight' "
+                        f"AND l.to_id=i.id SET {sets}, i.update_time=NOW(3) "
+                        "WHERE l.from_table='order' AND l.from_id=:oid AND l.field='所属订单'"
+                    ),
+                    {**shared, "oid": record_id},
+                )
         # 商机 ↔ 订单 共用字段：一边改了，对端同一次提交里跟着改（秒级生效）
         shared_hits = await _propagate_shared(session, wb.table, record_id, payload)
         await session.commit()
@@ -6762,6 +6785,16 @@ async def update_related_record(
                 status_code=422,
                 detail=f"保存失败（{rb.label}）：{type(exc).__name__}: {str(exc)[:200]}",
             ) from exc
+        if rb.table == "biz_ifreight" and "master_no" in clean:
+            await session.execute(
+                text(
+                    "UPDATE biz_order o JOIN biz_link l ON l.from_id=o.id "
+                    "SET o.master_no=:no, o.update_time=NOW(3) "
+                    "WHERE l.to_table='ifreight' AND l.to_id=:iid "
+                    "AND l.from_table='order' AND l.field='所属订单'"
+                ),
+                {"no": clean["master_no"], "iid": row_id},
+            )
         if rb.table == "biz_ifreight" and "house_bl_no" in clean:
             await session.execute(
                 text(
