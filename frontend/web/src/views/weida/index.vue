@@ -7540,13 +7540,13 @@ onUnmounted(disconnectEvents)
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   color: #fff;
-  margin-left: 6px;
+  cursor: pointer;
 }
 .wb-alert-dot.is-critical {
   background: #d92d20;
@@ -7667,10 +7667,24 @@ onUnmounted(disconnectEvents)
 .wb-form-compact :deep(.el-form-item:has(textarea)) {
   grid-column: span 2;
 }
+.wb-weekend-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f79009;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
 .wb-bill-alert-badge {
   display: inline-flex;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
@@ -7678,7 +7692,7 @@ onUnmounted(disconnectEvents)
   background: rgba(212, 160, 23, 0.16);
   color: #b07d0a;
   font-weight: 700;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1;
 }
 .wb-status-clickable {
