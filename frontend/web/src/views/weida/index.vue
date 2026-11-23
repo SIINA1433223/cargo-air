@@ -6050,6 +6050,12 @@ async function handoverOrder(row: RelatedRow) {
       return v === null || v === undefined || String(v).trim() === ''
     })
     .map(([, label]) => label)
+  // 运输条款以 D 开头（DAP/DDP…）时「要求到门时间」必填（妙搭 requiredWhen）
+  const clause = String(draft.transport_clause ?? blockValue(row, 'transport_clause') ?? '').trim()
+  const door = draft.required_door_time ?? blockValue(row, 'required_door_time')
+  if (clause.toUpperCase().startsWith('D') && (door === null || door === undefined || String(door).trim() === '')) {
+    missing.push('要求到门时间')
+  }
   if (missing.length) {
     ElMessage.warning(`交接前请先填写：${missing.join('、')}`)
     return
@@ -6788,6 +6794,19 @@ async function saveDetail() {
   if (drawerMode.value === 'create' && !canCreate.value) {
     ElMessage.warning(`还差必填项：${createMissing.value.join('、')}`)
     return
+  }
+  // 对客方案的两道门禁（妙搭 resultGates / resultRules）：
+  //   拿到货=是 之前必须先选定「最终对客方案」；拿到货=否 必须写「未拿到货备注」。
+  if (role.value === 'customer_service' && drawerMode.value === 'edit') {
+    const got = String(editModel.is_goods_received ?? '')
+    if (got === '是' && !editModel.final_plan_id) {
+      ElMessage.warning('请先选择「最终对客方案」，再把「是否拿到货」设为「是」')
+      return
+    }
+    if (got === '否' && !String(editModel.goods_not_received_remark ?? '').trim()) {
+      ElMessage.warning('「是否拿到货」选了「否」，「未拿到货备注」必须填写')
+      return
+    }
   }
   let fields: Record<string, any>
   try {
