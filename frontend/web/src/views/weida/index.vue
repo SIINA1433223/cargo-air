@@ -705,7 +705,7 @@
               <div
                 v-if="section.label === '货物详情' && role === 'domestic_ops'"
                 class="wb-attach-block">
-                <div v-for="mailField in ['国内邮件', '国外邮件']" :key="mailField" class="wb-attach-inner">
+                <div v-for="mailField in ['相关资料', '国内邮件', '国外邮件']" :key="mailField" class="wb-attach-inner">
                   <h4>{{ mailField }}</h4>
                   <div v-for="a in detailAttachments[mailField] || []" :key="a.id" class="wb-attach-row">
                     <a class="wb-attach-link" @click="downloadAttachment(a)">{{ a.file_name }}</a>
@@ -1301,7 +1301,100 @@
                   {{ a.file_name }}
                 </a>
               </div>
-              <el-table v-loading="relatedLoading[rb.key]" :data="relatedData[rb.key] || []" size="small" border>
+              <!-- 到货预报表：照妙搭那一页的表头逐列摆（父单字段 + 逐条 iFreight），
+                   与生成 Excel 的口径一致（见后端 arrival.py） -->
+              <el-table
+                v-if="rb.key === 'arrival_report'"
+                v-loading="relatedLoading[rb.key]"
+                :data="relatedData[rb.key] || []"
+                size="small"
+                border>
+                <el-table-column type="index" label="序号" width="48" />
+                <el-table-column label="操作日期" width="110">
+                  <template #default>{{ display(detail.fields.warehouse_in_operation_time?.value, 'date') }}</template>
+                </el-table-column>
+                <el-table-column label="航班日期" width="110">
+                  <template #default>{{ display(detail.fields.flight?.value, 'date') }}</template>
+                </el-table-column>
+                <el-table-column label="主单号" width="140">
+                  <template #default>{{ display(detail.fields.master_no?.value, 'text') }}</template>
+                </el-table-column>
+                <el-table-column label="分单号" width="140">
+                  <template #default="{ row }">{{ display(row.fields.house_bl_no?.value, 'text') }}</template>
+                </el-table-column>
+                <el-table-column label="主单目的港" width="100">
+                  <template #default>{{ display(detail.fields.destination?.value, 'text') }}</template>
+                </el-table-column>
+                <el-table-column label="分单目的港" width="100">
+                  <template #default>{{ display(detail.fields.destination?.value, 'text') }}</template>
+                </el-table-column>
+                <el-table-column label="件数" width="70">
+                  <template #default="{ row }">{{ display(row.fields.quantity?.value, 'number') }}</template>
+                </el-table-column>
+                <el-table-column label="毛重" width="80">
+                  <template #default="{ row }">{{ display(row.fields.gross_weight?.value, 'number') }}</template>
+                </el-table-column>
+                <el-table-column label="体积" width="80">
+                  <template #default="{ row }">{{ display(row.fields.volume?.value, 'number') }}</template>
+                </el-table-column>
+                <el-table-column label="尺寸" width="200">
+                  <template #default="{ row }">{{ display(row.fields.dimension?.value, 'text') }}</template>
+                </el-table-column>
+                <el-table-column label="品名" width="160">
+                  <template #default="{ row }">{{ display(row.fields.customs_declaration_goods_name?.value, 'text') }}</template>
+                </el-table-column>
+                <el-table-column label="司机信息" width="160">
+                  <template #default>{{ display(detail.fields.driver_info?.value, 'text') }}</template>
+                </el-table-column>
+                <el-table-column label="报关方式" width="100">
+                  <template #default>{{ display(detail.fields.customs_declaration_method?.value, 'text') }}</template>
+                </el-table-column>
+                <el-table-column label="代理操作要求" width="160">
+                  <template #default>{{ display(detail.fields.agent_operation_requirement?.value, 'text') }}</template>
+                </el-table-column>
+                <el-table-column label="主单英文品名" width="150">
+                  <template #default>{{ display(detail.fields.main_product_english_name?.value, 'text') || 'CONSOL SHIPMENT' }}</template>
+                </el-table-column>
+                <el-table-column label="主单发货人" width="170">
+                  <template #default>{{ 'WEIDA FREIGHT SYSTEM CO., LTD.' }}</template>
+                </el-table-column>
+                <el-table-column label="主单收货人" width="170">
+                  <template #default>{{ display(detail.fields.supplier?.value, 'text') }}</template>
+                </el-table-column>
+                <el-table-column label="主单通知人" width="170">
+                  <template #default>{{ display(detail.fields.main_notice_person?.value, 'text') || 'SAME AS CNEE' }}</template>
+                </el-table-column>
+                <el-table-column label="分单发货人" width="240">
+                  <template #default="{ row }">
+                    {{ display(row.fields.shipper_name?.value, 'text') }}
+                    <div class="wb-muted">{{ display(row.fields.shipper_address?.value, 'text') }}</div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="分单收货人" width="240">
+                  <template #default="{ row }">
+                    {{ display(row.fields.consignee_name?.value, 'text') }}
+                    <div class="wb-muted">{{ display(row.fields.consignee_address?.value, 'text') }}</div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="分单通知人" width="240">
+                  <template #default="{ row }">
+                    {{ display(row.fields.notify_party_name?.value, 'text') }}
+                    <div class="wb-muted">{{ display(row.fields.notify_party_address?.value, 'text') }}</div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="分单品名" width="150">
+                  <template #default="{ row }">{{ display(row.fields.goods_description?.value, 'text') }}</template>
+                </el-table-column>
+                <template #empty>
+                  <el-empty description="暂无关联记录" />
+                </template>
+              </el-table>
+              <el-table
+                v-else
+                v-loading="relatedLoading[rb.key]"
+                :data="relatedData[rb.key] || []"
+                size="small"
+                border>
                 <el-table-column v-if="rb.key === 'ifreight'" type="expand" width="44">
                   <template #default="{ row }">
                     <div class="wb-ifreight-expand">
@@ -4651,6 +4744,7 @@ async function openDetail(row: Row) {
         loadDetailAttachment('二程入货通知'),
         loadDetailAttachment('国内邮件'),
         loadDetailAttachment('国外邮件'),
+        loadDetailAttachment('相关资料'),
         loadDetailAttachment('报价单'),
         loadDetailAttachment('订舱单'),
       ])
@@ -7361,6 +7455,11 @@ onUnmounted(disconnectEvents)
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px dashed #e5dfd3;
+}
+.wb-muted {
+  color: #8a8378;
+  font-size: 12px;
+  white-space: pre-wrap;
 }
 .wb-attach-block {
   margin-top: 12px;
