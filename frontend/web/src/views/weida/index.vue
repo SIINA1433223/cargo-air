@@ -736,12 +736,6 @@
                   </el-table-column>
                 </el-table>
               </div>
-              <div v-if="section.label === '国外预报' && role === 'domestic_ops'" class="wb-dash-section" style="margin-top: 14px">
-                <h4>到货预报确认</h4>
-                <p v-if="detail.arrival_check?.confirmed">当前账号已确认</p>
-                <p v-else>当前账号还没有确认这一票的预报 draft</p>
-                <el-button size="small" type="primary" @click="confirmArrival">确认到货预报</el-button>
-              </div>
               <div v-if="section.label === '货物详情'" class="wb-info-panels">
                 <div class="wb-info-row">
                   <span>启运港操作要求</span>
@@ -1460,6 +1454,33 @@
                 </el-table-column>
                 <el-table-column label="分单品名" width="150">
                   <template #default="{ row }">{{ display(row.fields.goods_description?.value, 'text') }}</template>
+                </el-table-column>
+                <template #empty>
+                  <el-empty description="暂无关联记录" />
+                </template>
+              </el-table>
+              <!-- 投保：妙搭是「分单号 / 发票号」两列 + 行展开看 12 项明细，不是平铺大表 -->
+              <el-table
+                v-else-if="rb.key === 'insurance'"
+                v-loading="relatedLoading[rb.key]"
+                :data="relatedData[rb.key] || []"
+                size="small"
+                border>
+                <el-table-column type="expand" width="44">
+                  <template #default="{ row }">
+                    <div class="wb-ins-grid">
+                      <div v-for="f in INSURANCE_DETAIL" :key="f.column" class="wb-ins-field">
+                        <label>{{ f.label }}</label>
+                        <div>{{ display(row.fields[f.column]?.value, f.type) }}</div>
+                      </div>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="分单号" min-width="140" show-overflow-tooltip>
+                  <template #default="{ row }">{{ display(row.fields.house_bl_no?.value, 'text') }}</template>
+                </el-table-column>
+                <el-table-column label="发票号" min-width="140" show-overflow-tooltip>
+                  <template #default="{ row }">{{ display(row.fields.customer_ref_no?.value, 'text') }}</template>
                 </el-table-column>
                 <template #empty>
                   <el-empty description="暂无关联记录" />
@@ -2404,7 +2425,6 @@ type Row = {
   fields: Record<string, FieldValue>
   handover?: { to_name?: string; end_at?: string; can_cancel?: boolean }
   weekend_check?: { pending: boolean; items: Record<string, boolean> }
-  arrival_check?: { confirmed: boolean }
   flight_changed?: boolean
   alerts?: Array<{
     severity: string
@@ -3232,6 +3252,22 @@ const handoverBusy = ref<number | null>(null)
 const orderAttachments = reactive<Record<number, AttachmentItem[]>>({})
 // 交接操作页的三个附件列（相关资料 / 国内邮件 / 国外邮件），按订单挂
 const ORDER_ATTACH_FIELDS = ['相关资料', '国内邮件', '国外邮件'] as const
+// 投保页行展开的明细（妙搭 detailColumns，逐字对齐）
+const INSURANCE_DETAIL: Array<{ column: string; label: string; type: string }> = [
+  { column: 'app_insurance', label: '投保', type: 'checkbox' },
+  { column: 'insurance_clause', label: '投保条款', type: 'text' },
+  { column: 'client_name', label: '被保险人', type: 'text' },
+  { column: 'quantity', label: '件数', type: 'number' },
+  { column: 'piece_unit', label: '单位', type: 'text' },
+  { column: 'customs_declaration_goods_name', label: '中文品名', type: 'text' },
+  { column: 'goods_description', label: '英文品名', type: 'text' },
+  { column: 'consignee_address', label: '派送地址', type: 'text' },
+  { column: 'declaration_amount', label: '总价', type: 'number' },
+  { column: 'currency', label: '币制', type: 'text' },
+  { column: 'port_of_departure', label: '启运地', type: 'text' },
+  { column: 'transport_mode', label: '运输方式', type: 'text' },
+  { column: 'customs_invoice', label: '发票', type: 'text' },
+]
 const orderExtraAttachments = reactive<Record<number, Record<string, AttachmentItem[]>>>({})
 const orderSnapshots = reactive<Record<number, string>>({})
 const goodsSnapshots = reactive<Record<number, string>>({})
@@ -5395,20 +5431,6 @@ async function saveWeekendCheck() {
   }
 }
 
-async function confirmArrival() {
-  if (!detail.value) return
-  try {
-    await request({
-      url: `/weida/domestic_ops/orders/${detail.value.id}/checks`,
-      method: 'post',
-      data: { kind: 'arrival', items: {}, confirmed: true },
-    })
-    detail.value.arrival_check = { confirmed: true }
-    ElMessage.success('已确认到货预报')
-  } catch (e: any) {
-    ElMessage.error(e?.message || '确认失败')
-  }
-}
 
 async function markFlightSeen() {
   if (!detail.value) return
@@ -7659,6 +7681,23 @@ onUnmounted(disconnectEvents)
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px dashed #e5dfd3;
+}
+.wb-ins-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 6px 18px;
+  padding: 8px 14px;
+}
+.wb-ins-field label {
+  display: block;
+  font-size: 12px;
+  color: #8a8378;
+}
+.wb-ins-field div {
+  font-size: 13px;
+  color: #2f2a24;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .wb-muted {
   color: #8a8378;
