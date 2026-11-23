@@ -135,6 +135,19 @@ async def render_documents(
     if not node:
         raise ValueError("服务器上没有可用的 Node 运行环境")
     payload = await _build_input(order_id)
+    # 到货预报表：分单发货人/收货人/通知人/分单品名 一律空值（用户 2026-11-23）
+    if wanted == ["arrival"]:
+        for row in payload.get("ifreights", []):
+            for key in (
+                "发货人名称",
+                "发货人地址",
+                "收货人名称",
+                "收货人地址",
+                "通知人名称",
+                "通知人地址",
+                "货品描述",
+            ):
+                row["record"].pop(key, None)
     workdir = Path(tempfile.mkdtemp(prefix="docgen-"))
     try:
         source = workdir / "input.json"

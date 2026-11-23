@@ -1468,16 +1468,29 @@
                   </template>
                 </el-table-column>
                 <el-table-column label="司机信息" width="160">
-                  <template #default>{{ display(detail.fields.driver_info?.value, 'text') }}</template>
+                  <template #default>
+                    <el-input :model-value="detail.fields.driver_info?.value ?? ''" size="small"
+                      @change="(v: string) => saveOrderField('driver_info', v)" />
+                  </template>
                 </el-table-column>
                 <el-table-column label="报关方式" width="100">
-                  <template #default>{{ display(detail.fields.customs_declaration_method?.value, 'text') }}</template>
+                  <template #default>
+                    <el-input :model-value="detail.fields.customs_declaration_method?.value ?? ''" size="small"
+                      @change="(v: string) => saveOrderField('customs_declaration_method', v)" />
+                  </template>
                 </el-table-column>
                 <el-table-column label="代理操作要求" width="160">
-                  <template #default>{{ display(detail.fields.agent_operation_requirement?.value, 'text') }}</template>
+                  <template #default>
+                    <el-input :model-value="detail.fields.agent_operation_requirement?.value ?? ''" size="small"
+                      @change="(v: string) => saveOrderField('agent_operation_requirement', v)" />
+                  </template>
                 </el-table-column>
                 <el-table-column label="主单英文品名" width="150">
-                  <template #default>{{ display(detail.fields.main_product_english_name?.value, 'text') || 'CONSOL SHIPMENT' }}</template>
+                  <template #default>
+                    <el-input :model-value="detail.fields.main_product_english_name?.value ?? ''" size="small"
+                      placeholder="CONSOL SHIPMENT"
+                      @change="(v: string) => saveOrderField('main_product_english_name', v)" />
+                  </template>
                 </el-table-column>
                 <el-table-column label="主单发货人" width="170">
                   <template #default>{{ 'WEIDA FREIGHT SYSTEM CO., LTD.' }}</template>
@@ -1488,30 +1501,10 @@
                 <el-table-column label="主单通知人" width="170">
                   <template #default>{{ display(detail.fields.main_notice_person?.value, 'text') || 'SAME AS CNEE' }}</template>
                 </el-table-column>
-                <el-table-column label="分单发货人" width="240">
-                  <template #default="{ row }">
-                    {{ display(row.fields.shipper_name?.value, 'text') }}
-                    <div class="wb-muted">{{ display(row.fields.shipper_address?.value, 'text') }}</div>
-                  </template>
-                </el-table-column>
-                <el-table-column label="分单收货人" width="240">
-                  <template #default="{ row }">
-                    {{ display(row.fields.consignee_name?.value, 'text') }}
-                    <div class="wb-muted">{{ display(row.fields.consignee_address?.value, 'text') }}</div>
-                  </template>
-                </el-table-column>
-                <el-table-column label="分单通知人" width="240">
-                  <template #default="{ row }">
-                    {{ display(row.fields.notify_party_name?.value, 'text') }}
-                    <div class="wb-muted">{{ display(row.fields.notify_party_address?.value, 'text') }}</div>
-                  </template>
-                </el-table-column>
-                <el-table-column label="分单品名" width="150">
-                  <template #default="{ row }">
-                    <el-input :model-value="row.fields.goods_description?.value ?? ''" size="small"
-                      @change="(v: string) => saveRelatedField(rb, row, 'goods_description', v)" />
-                  </template>
-                </el-table-column>
+                <el-table-column label="分单发货人" width="240" />
+                <el-table-column label="分单收货人" width="240" />
+                <el-table-column label="分单通知人" width="240" />
+                <el-table-column label="分单品名" width="150" />
                 <template #empty>
                   <el-empty description="暂无关联记录" />
                 </template>
@@ -6787,6 +6780,21 @@ async function calcIfreightVolume(rb: RelatedBlock, row: RelatedRow) {
   await saveRelatedField(rb, row, 'volume_weight', String(weight))
   await saveRelatedField(rb, row, 'customer_billing_weight', String(billing))
   ElMessage.success(`体积 ${parsed.volume} m³，客户计费重 ${billing} kg`)
+}
+
+async function saveOrderField(column: string, value: string) {
+  if (!detail.value) return
+  try {
+    await request({
+      url: `/weida/${role.value}/records/${detail.value.id}`,
+      method: 'patch',
+      data: { fields: { [column]: value } },
+    })
+    detail.value.fields[column] = { label: column, value }
+    ElMessage.success('已保存')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '保存失败')
+  }
 }
 
 async function saveRelatedField(rb: RelatedBlock, row: RelatedRow, column: string, value: string) {

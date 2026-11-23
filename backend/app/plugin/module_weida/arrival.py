@@ -167,10 +167,11 @@ def render(
             WEIDA_SHIPPER,
             mawb_consignee,
             mawb_notify,
-            _strip_contacts(_person(row.get("shipper_name"), row.get("shipper_address"))),
-            _strip_contacts(_person(row.get("consignee_name"), row.get("consignee_address"))),
-            notify,
-            _text(row.get("goods_description")),
+            # 用户 2026-11-23：分单发货人/收货人/通知人/分单品名 一律按空值出表
+            "",
+            "",
+            "",
+            "",
         ]
         for col, value in enumerate(values, 1):
             ws.cell(target, col).value = value
