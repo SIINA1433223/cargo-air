@@ -1,0 +1,315 @@
+{
+"columns": [
+{
+"kind": "detail",
+"label": "查看"
+},
+{
+"kind": "field",
+"name": "账单状态"
+},
+{
+"kind": "field",
+"name": "客户"
+},
+{
+"kind": "field",
+"name": "供应商"
+},
+{
+"kind": "field",
+"name": "国外代理"
+},
+{
+"kind": "field",
+"name": "入青岛仓号"
+},
+{
+"kind": "field",
+"name": "费用记录"
+},
+{
+"kind": "field",
+"name": "提货费"
+},
+{
+"kind": "field",
+"name": "代理入仓号"
+},
+{
+"kind": "field",
+"name": "客户 REF NO."
+},
+{
+"kind": "field",
+"name": "主单号"
+},
+{
+"kind": "field",
+"name": "分单号"
+},
+{
+"kind": "field",
+"name": "起运地"
+},
+{
+"kind": "field",
+"name": "目的地"
+},
+{
+"kind": "field",
+"name": "货物数据"
+},
+{
+"kind": "field",
+"name": "入仓操作时间"
+},
+{
+"kind": "field",
+"name": "运输条款"
+},
+{
+"kind": "field",
+"name": "航班"
+},
+{
+"kind": "field",
+"name": "货好时间"
+},
+{
+"kind": "field",
+"name": "航司"
+},
+{
+"kind": "blank",
+"label": "货物状态"
+},
+{
+"kind": "field",
+"name": "POD"
+},
+{
+"kind": "field",
+"name": "已派送"
+},
+{
+"kind": "field",
+"name": "操作单票状态"
+},
+{
+"kind": "field",
+"name": "司机信息"
+},
+{
+"kind": "field",
+"name": "出口口岸"
+},
+{
+"kind": "field",
+"name": "发送预报"
+},
+{
+"kind": "field",
+"name": "等级、比例要求"
+},
+{
+"kind": "field",
+"name": "操作要求"
+},
+{
+"kind": "field",
+"name": "商机编号"
+},
+{
+"kind": "field",
+"name": "订单编号"
+},
+{
+"kind": "field",
+"name": "货物品名（货物特殊属性）"
+},
+{
+"kind": "field",
+"name": "提货车队"
+},
+{
+"kind": "field",
+"name": "备注"
+},
+{
+"kind": "field",
+"name": "特殊操作要求"
+},
+{
+"kind": "field",
+"name": "报关方式"
+},
+{
+"kind": "field",
+"name": "代理deadline"
+},
+{
+"kind": "field",
+"name": "派送地址"
+}
+],
+"views": [],
+"rowHeights": {
+"reczz28NbUvGkbyN": 59,
+"reczz28NF1FRo2AI": 78,
+"reczz28O8I7Ftgny": 47,
+"reczz28NCwkXtFdV": 54,
+"reczz28PsoNgxThY": 52,
+"reczz28QOkRbz6rn": 52,
+"reczz28QOcCUBDel": 62
+},
+"frozenColumnIds": [
+"客户",
+"供应商",
+"国外代理",
+"代理入仓号",
+"主单号",
+"分单号",
+"客户 REF NO.",
+"目的地",
+"起运地",
+"detail"
+],
+"columnWidths": {
+"已派送": 84,
+"商机编号": 108,
+"客户": 76,
+"供应商": 85,
+"国外代理": 106,
+"航司": 60,
+"入仓操作时间": 126,
+"操作单票状态": 78,
+"航班": 102,
+"起运地": 84,
+"目的地": 80,
+"提货车队": 109,
+"summary:操作概览": 79,
+"已开票": 160,
+"订单编号": 108,
+"主单号": 164,
+"入青岛仓号": 100,
+"代理入仓号": 125,
+"提货费": 70,
+"派送地址": 111,
+"代理deadline": 120,
+"报关方式": 91,
+"发提货邮件": 98,
+"下发操作计划": 84,
+"发送预报": 61,
+"司机信息": 119,
+"blank:货物状态": 144,
+"blank:已送达": 99,
+"货好时间": 109,
+"费用记录": 89,
+"运输条款": 64,
+"特殊操作要求": 174,
+"账单状态": 131,
+"POD": 86
+},
+"cellTextStyles": {},
+"rowTextStyles": {},
+"columnTextStyles": {},
+"blankValues": {
+"reczz28LGKJJgKD1:blank:货物状态": "收货人已提货",
+"reczz28LGKJJgKD1:blank:已送达": "是",
+"reczz28LFgYTbJb0:blank:已送达": "是",
+"reczz28LcpVoVW48:blank:货物状态": "22号到门",
+"reczz28LFgYTbJb0:blank:货物状态": "CIF",
+"reczz28MoOXQtvGW:blank:货物状态": "21号到门",
+"reczz28N60yEDwh9:blank:货物状态": "23号到门",
+"reczz28NCaW96W7l:blank:货物状态": "23号到门",
+"reczz28NbUvGkbyN:blank:货物状态": "23号到门",
+"reczz28NF1FRo2AI:blank:货物状态": "30号已到门",
+"reczz28NCwkXtFdV:blank:货物状态": "26号到门",
+"reczz28NFGN0Bf0N:blank:已送达": "是",
+"reczz28NFGN0Bf0N:blank:货物状态": "已到港CIF",
+"reczz28HewrCz8uZ:blank:已送达": "是",
+"reczz28HewrCz8uZ:blank:货物状态": "POD已发",
+"reczz28KmIPUrgbi:blank:货物状态": "CIF，已到港",
+"reczz28KmIPUrgbi:blank:已送达": "是",
+"reczz28LCdMp0iSv:blank:已送达": "是",
+"reczz28LCdMp0iSv:blank:货物状态": "CIF",
+"reczz28O8I7Ftgny:blank:货物状态": "23号已经到门",
+"reczz28O1G4ZIOCw:blank:货物状态": "已到港CIF",
+"reczz28O1G4ZIOCw:blank:已送达": "是",
+"reczz28L9OtUtPUB:blank:货物状态": "22号已到门",
+"reczz28L9OtUtPUB:blank:已送达": "是",
+"reczz28KjoVI0Ekh:blank:货物状态": "测试用，无实单",
+"reczz28PsoNgxThY:blank:货物状态": "已经抵达ATL",
+"reczz28LcpVoVW48:blank:已送达": "是",
+"reczz28NCaW96W7l:blank:已送达": "是",
+"reczz28NbUvGkbyN:blank:已送达": "是",
+"reczz28O8I7Ftgny:blank:已送达": "是",
+"reczz28QnDsKpgvx:blank:货物状态": "2号到门",
+"reczz28MoOXQtvGW:blank:已送达": "是",
+"reczz28PsoNgxThY:blank:已送达": "是",
+"reczz28PUO2LxBM9:blank:货物状态": "已经到门",
+"reczz28QmcuifuJE:blank:货物状态": "2号到门",
+"reczz28QISIkKpGP:blank:货物状态": "11月3号到门",
+"reczz28QOkRbz6rn:blank:货物状态": "6号到门",
+"reczz28QPE3nSiLX:blank:货物状态": "6号已到门",
+"reczz28T462ieHd6:blank:货物状态": "18号已经到门",
+"reczz28SGWzzqcVC:blank:货物状态": "4号已经 派送到门",
+"reczz28PUO2LxBM9:blank:已送达": "是",
+"reczz28TNQC8JNj6:blank:货物状态": "4号抵达VIE",
+"reczz28TWc73uioj:blank:货物状态": "6号到门",
+"reczz28T9iwOiUMD:blank:货物状态": "6号到门",
+"reczz28SNXDjZpBb:blank:货物状态": "12号已经到门",
+"reczz28SMq37i8oc:blank:货物状态": "6号抵达JNB",
+"reczz28SMPrIVjgi:blank:货物状态": "4号已提货",
+"reczz28NF1FRo2AI:blank:已送达": "是",
+"reczz28TQIha7i3L:blank:货物状态": "10号已到门",
+"reczz28ULiE4oPBy:blank:货物状态": "17号到门",
+"reczz28TukVDONNn:blank:货物状态": "5号派送到门",
+"reczz28Ta0QMMN2H:blank:货物状态": "9号已到门",
+"reczz28Uj3uY97bz:blank:货物状态": "待收货人清关",
+"reczz28TqmNnpoIU:blank:货物状态": "16号到门",
+"reczz28V5xTuKmUA:blank:货物状态": "9号抵达VIE机场",
+"reczz28V76cdK8Cz:blank:货物状态": "8号到LHR",
+"reczz28UkWLhA9lt:blank:货物状态": "仓储标准待国外确认10号已经到门",
+"reczz28ULZwcOlKQ:blank:货物状态": "11号到门",
+"reczz28Tr9SAwyd6:blank:货物状态": "11号到门",
+"reczz28Tr2LDNfTm:blank:货物状态": "16号到门，有仓储费",
+"reczz28V45ZgiM0q:blank:货物状态": "1件脏污",
+"reczz28UkYw1oodF:blank:货物状态": "12号到门",
+"reczz28WJ7zIe8Cw:blank:货物状态": "10号到门",
+"reczz28V8H6dzzuU:blank:货物状态": "10号已经到门",
+"reczz28V8HePXDdS:blank:货物状态": "16号到门",
+"reczz28VogvlXS55:blank:货物状态": "13号到门",
+"reczz28VXJVwrndo:blank:货物状态": "10号飞MEX",
+"reczz28WKVvW9ioo:blank:货物状态": "预计18号到门",
+"reczz28XugnBrUPH:blank:货物状态": "17号到门",
+"reczz28XQvYHjui5:blank:货物状态": "19号到门",
+"reczz28XTkGubECX:blank:货物状态": "已经抵达LAX",
+"reczz28WMdqeFqdj:blank:货物状态": "15号已经抵达LHR",
+"reczz28YChxkMTWk:blank:货物状态": "已经抵达JFK",
+"reczz28YKIdEOusE:blank:货物状态": "15号已经到MXP",
+"reczz28YxwY8OISf:blank:货物状态": "19号已到OTP，预计23号到门",
+"reczz28Z4Nv9xwFh:blank:货物状态": "20号已到门",
+"reczz28agdlfbfUs:blank:货物状态": "已经抵达FRA",
+"reczz28aIjZLQcSB:blank:货物状态": "23号已经抵达CDG",
+"reczz28b64gR8pXu:blank:货物状态": "booking已发",
+"reczz28Yj3up6rQG:blank:货物状态": "20号已经抵达ORD",
+"reczz28Z5DypU4Cq:blank:货物状态": "19号抵达VIE",
+"reczz28awlWmKM5F:blank:货物状态": "预计29号抵达LYS",
+"reczz28aZOhgXcJA:blank:货物状态": "待飞",
+"reczz28brdTS94kU:blank:货物状态": "booking已发",
+"reczz28bsOhiC4mC:blank:货物状态": "派送地址待定",
+"reczz28b6Vo7PY43:blank:货物状态": "booking已发",
+"reczz28bkbXMsGBn:blank:货物状态": "预计26号到ATL",
+"reczz28b5HwxDKId:blank:货物状态": "21号到上海",
+"reczz28aHksgjxaY:blank:货物状态": "26号到CDG",
+"reczz28aiMMNNt0u:blank:货物状态": "21号到ATL",
+"reczz28agpAaLitc:blank:货物状态": "21号到BCN",
+"reczz28ag0DZBpj5:blank:货物状态": "预计21号到MEX",
+"reczz28brSdT9ta4:blank:货物状态": "booking已发",
+"reczz28ah9RwSRFd:blank:货物状态": "缺清关文件",
+"reczz28bNahscN4E:blank:货物状态": "已放行",
+"reczz28aGBEUFRTj:blank:货物状态": "已经抵达LHR"
+}
+}

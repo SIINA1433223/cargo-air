@@ -2652,6 +2652,7 @@ import ECharts from '@/components/ECharts/index.vue'
 // 进入操作台时自动铺一次，之后以本机改动为准（见 maybeSeedViewConfig）。
 import landisViewConfig from './configs/landis.json'
 import lilyViewConfig from './configs/lily.json'
+import echoViewConfig from './configs/echo.json'
 
 defineOptions({ name: 'WeidaWorkbench' })
 
@@ -4199,6 +4200,7 @@ async function loadConfig() {
 const MIAODA_SEEDS: Record<string, any> = {
   'Landis Liu': landisViewConfig,
   'Lily Sun': lilyViewConfig,
+  'Echo Liu': echoViewConfig,
 }
 const SEED_VERSION = 'v1'
 
@@ -4977,10 +4979,14 @@ function paintCellStyle({ row, column }: { row: Row; column: any }) {
   const key = String(column?.property || '')
   if (!key) return {}
   const statusColor = rowTint(row)
+  // 客服工作台：条件填色一律按「整行」算（用户 2026-11-24）。
+  // 以前配成「单元格」的规则也跟着整行上色，不用逐条改。
+  const rowWide = role.value === 'customer_service'
   for (const rule of paintRules.value) {
-    if (rule.scope === 'column') {
+    const scope = rowWide && rule.scope === 'cell' ? 'row' : rule.scope
+    if (scope === 'column') {
       if (rule.column !== key) continue
-    } else if (rule.scope === 'cell' && rule.column !== key) {
+    } else if (scope === 'cell' && rule.column !== key) {
       continue
     } else if (!paintMatch(rule, row)) {
       continue
