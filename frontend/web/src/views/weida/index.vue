@@ -8065,6 +8065,13 @@ onMounted(async () => {
     router.replace(`/weida/${rolePath[staffRole]}`)
     return
   }
+  // 普通员工只能进自己那张台子（管理员除外）；手输别的台子地址直接送回自己的
+  const isAdminStaff = ['admin', 'super_admin'].includes(staffRole)
+  const ownPath = rolePath[staffRole]
+  if (seg && ownPath && !isAdminStaff && ROLE_MAP[seg] && ROLE_MAP[seg] !== staffRole) {
+    router.replace(`/weida/${ownPath}`)
+    return
+  }
   await load()
   void loadVendors()
   void loadStaffOptions()
@@ -9246,5 +9253,44 @@ onUnmounted(() => {
   justify-content: center;
   color: hsl(34 9% 44%);
   font-size: 13px;
+}
+
+/* ── 表格网格线：行列都描清楚一点（用户 2026-11-24） ─────────────── */
+.wb-table :deep(.ant-table.ant-table-bordered > .ant-table-container > .ant-table-content > table > thead > tr > th),
+.wb-table :deep(.ant-table.ant-table-bordered > .ant-table-container > .ant-table-content > table > tbody > tr > td),
+.wb-table :deep(.ant-table.ant-table-bordered > .ant-table-container > .ant-table-header > table > thead > tr > th),
+.wb-table :deep(.ant-table.ant-table-bordered > .ant-table-container > .ant-table-body > table > tbody > tr > td) {
+  border-right: 1px solid hsl(35 12% 78%) !important;
+  border-bottom: 1px solid hsl(35 12% 78%) !important;
+}
+.wb-table :deep(.ant-table-thead > tr > th) {
+  border-bottom: 1px solid hsl(35 12% 66%) !important;
+}
+
+/* ── 横向滚动条：内容不满一屏也要有一条，且固定在最底下 ───────────── */
+.wb-table :deep(.ant-table-body),
+.wb-table :deep(.ant-table-content) {
+  overflow-x: scroll !important;
+  scrollbar-gutter: stable;
+}
+.wb-table :deep(.ant-table-body)::-webkit-scrollbar,
+.wb-table :deep(.ant-table-content)::-webkit-scrollbar {
+  width: 12px;
+  height: 14px;
+}
+.wb-table :deep(.ant-table-body)::-webkit-scrollbar-track,
+.wb-table :deep(.ant-table-content)::-webkit-scrollbar-track {
+  background: hsl(38 20% 91%);
+  border-top: 1px solid hsl(35 12% 78%);
+}
+.wb-table :deep(.ant-table-body)::-webkit-scrollbar-thumb,
+.wb-table :deep(.ant-table-content)::-webkit-scrollbar-thumb {
+  background: hsl(35 10% 66%);
+  border: 3px solid hsl(38 20% 91%);
+  border-radius: 8px;
+}
+.wb-table :deep(.ant-table-body)::-webkit-scrollbar-thumb:hover,
+.wb-table :deep(.ant-table-content)::-webkit-scrollbar-thumb:hover {
+  background: hsl(35 10% 55%);
 }
 </style>

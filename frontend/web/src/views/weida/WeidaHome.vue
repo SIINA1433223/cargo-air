@@ -9,7 +9,7 @@
       <div class="wh-rule-strong"></div>
       <div class="wh-rule-light"></div>
 
-      <div class="wh-grid">
+      <div class="wh-grid" :class="{ 'is-single': cards.length === 1 }">
         <div v-for="(c, i) in cards" :key="c.role" class="wh-col">
           <div class="wh-card" @click="router.push(`/weida/${c.role}`)">
             <div class="wh-card-top">
@@ -21,16 +21,23 @@
             <p class="wh-detail">{{ c.detail }}</p>
             <div class="wh-enter">进入 →</div>
           </div>
-          <button class="wh-dashboard" @click="router.push(`/weida/${c.dashboard}`)">
+          <!-- 仪表盘只给管理员与本角色被点名的人（Echo 要看操作仪表盘） -->
+          <button
+            v-if="showDashboard(c)"
+            class="wh-dashboard"
+            @click="router.push(`/weida/${c.dashboard}`)">
             打开{{ c.title }}仪表盘
           </button>
         </div>
       </div>
 
       <footer class="wh-foot">
-        <a @click="router.push('/weida/master-data')">基础数据</a>
-        <span>· 客商、人员、港口、选项字典</span>
-        <a style="margin-left: 16px" @click="pwdOpen = true">修改密码</a>
+        <template v-if="isSuper">
+          <a @click="router.push('/weida/master-data')">基础数据</a>
+          <span>· 客商、人员、港口、选项字典</span>
+        </template>
+        <a :style="isSuper ? 'margin-left: 16px' : ''" @click="pwdOpen = true">修改密码</a>
+        <a style="margin-left: 16px" @click="logout">退出登录</a>
       </footer>
     </div>
     <el-dialog v-model="pwdOpen" title="修改密码" width="420px">
@@ -54,13 +61,15 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '@/utils/http'
+import { useUserStore } from '@stores/modules/user.store'
 
 defineOptions({ name: 'WeidaHome' })
 const router = useRouter()
+const userStore = useUserStore()
 const pwdOpen = ref(false)
 const pwdSaving = ref(false)
 const pwdForm = reactive({ old_password: '', new_password: '', confirm: '' })
@@ -92,7 +101,7 @@ async function changePassword() {
     pwdSaving.value = false
   }
 }
-const cards = [
+const ALL_CARDS = [
   {
     role: 'customer_service',
     dashboard: 'dashboard-cs',
@@ -117,7 +126,73 @@ const cards = [
     detail: '交接后建分单、提货计划、报关、代理到货、国外预报、做账与开票。',
     icon: '操',
   },
-]
+] as const
+
+/**
+ * 角色可见性（用户 2026-11-24）：
+ * - 管理员：三张台子 + 三个仪表盘都能看到，但**看不到基础数据**；
+ * - 普通员工：只看到自己那一张台子，不给仪表盘；
+ * - Echo Liu：操作台之外额外给「操作仪表盘」。
+ * 基础数据只留给超级管理员。
+ */
+/** 后端给的登录人身份（/weida/me）；拿不到就退回用户信息里的角色 */
+const meProfile = ref<{ name?: string; role?: string; roles?: string[]; is_superuser?: boolean } | null>(null)
+
+const roleCodes = computed<string[]>(() => {
+  const direct = (meProfile.value?.roles || []).map((r) => String(r))
+  if (direct.length) return direct.map((r) => r.toUpperCase().replace(/[\s-]+/g, '_'))
+  const roles = (userStore.info as any)?.roles
+  if (!Array.isArray(roles)) return []
+  return roles
+    .map((r: any) => String(r?.code || r?.name || '').toUpperCase().replace(/[\s-]+/g, '_'))
+    .filter(Boolean)
+})
+const isSuper = computed(
+  () => meProfile.value?.is_superuser === true || !!userStore.info.is_superuser || roleCodes.value.includes('SUPER_ADMIN')
+)
+const isAdmin = computed(
+  () => isSuper.value || roleCodes.value.includes('ADMIN') || roleCodes.value.includes('管理员')
+)
+/** 登录人对应的业务角色（与 weida_user_map / 后端 current_staff.role 同一套取值） */
+const staffRole = computed(() => {
+  const backendRole = String(meProfile.value?.role || '')
+  if (backendRole) return backendRole
+  const map: Record<string, string> = {
+    CUSTOMER_SERVICE: 'customer_service',
+    PRICING: 'pricing',
+    DOMESTIC_OPS: 'domestic_ops',
+  }
+  for (const code of roleCodes.value) {
+    if (map[code]) return map[code]
+  }
+  return ''
+})
+const staffName = computed(() => String(meProfile.value?.name || userStore.info.name || '').trim())
+
+onMounted(async () => {
+  try {
+    const res = await request<any>({ url: '/weida/me', method: 'get' })
+    meProfile.value = res.data?.data ?? null
+  } catch {
+    meProfile.value = null
+  }
+})
+
+/** 管理员看全部；其他人只看自己那一张台子 */
+const cards = computed(() => {
+  if (isAdmin.value) return ALL_CARDS
+  return ALL_CARDS.filter((c) => c.role === staffRole.value)
+})
+
+/** 仪表盘入口：管理员都有；Echo Liu 额外给操作仪表盘 */
+function showDashboard(card: { role: string }) {
+  if (isAdmin.value) return true
+  return card.role === 'domestic_ops' && staffName.value === 'Echo Liu'
+}
+
+async function logout() {
+  await userStore.logout()
+}
 </script>
 
 <style scoped>

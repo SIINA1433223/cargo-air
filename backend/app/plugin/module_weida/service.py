@@ -234,6 +234,37 @@ def _block_field(
     return {**BLOCK_VIRTUALS[col], "column": col, "editable": False}
 
 
+async def current_staff_profile(user: Any) -> dict[str, Any]:
+    """登录人身份：工作台首页据此决定能看哪几张台子、哪个仪表盘。"""
+    async with async_db_session() as session:
+        row = (
+            await session.execute(
+                text(
+                    "SELECT name, role, roles, suda_user_id FROM weida_user_map "
+                    "WHERE local_user_id = :uid AND active = 1 LIMIT 1"
+                ),
+                {"uid": int(getattr(user, "id", 0) or 0)},
+            )
+        ).mappings().first()
+    roles: list[str] = []
+    if row:
+        try:
+            parsed = json.loads(row.get("roles") or "[]")
+            if isinstance(parsed, list):
+                roles = [str(x) for x in parsed]
+        except (TypeError, json.JSONDecodeError):
+            roles = []
+        if not roles and row.get("role"):
+            roles = [str(row["role"])]
+    return {
+        "id": int(getattr(user, "id", 0) or 0),
+        "name": (row or {}).get("name") or getattr(user, "name", "") or "",
+        "role": (row or {}).get("role") or "",
+        "roles": roles,
+        "is_superuser": bool(getattr(user, "is_superuser", False)),
+    }
+
+
 async def get_config(
     role: str, wb: WorkbenchDef, viewer_user_id: int | None = None
 ) -> dict[str, Any]:
@@ -4390,11 +4421,18 @@ async def get_opportunity_pricing(opportunity_id: int) -> dict[str, Any]:
                     "  WHERE l3.from_table = 'pricing' AND l3.from_id = p.id "
                     "    AND l3.to_table = 'plan' AND l3.field = '被方案采用'"
                     ") AS adopted_count "
-                    "FROM biz_link l "
-                    "JOIN biz_pricing p ON p.id = l.to_id AND p.is_deleted = 0 "
-                    "JOIN biz_opportunity op ON op.id = l.from_id AND op.is_deleted = 0 "
-                    "WHERE l.from_table = 'opportunity' AND l.from_id = :oid "
-                    "  AND l.to_table = 'pricing' AND l.field = '航线报价' "
+                    "FROM biz_pricing p "
+                    "JOIN biz_opportunity op ON op.id = :oid AND op.is_deleted = 0 "
+                    "WHERE p.is_deleted = 0 AND ("
+                    # 两个方向都收：飞书双向关联有时只回填「报价→关联商机」那一侧，
+                    # 老数据（用户 2026-11-24 报的 OP-2611649 等 41 条）就是这种。
+                    "  EXISTS (SELECT 1 FROM biz_link l WHERE l.from_table = 'opportunity' "
+                    "    AND l.from_id = :oid AND l.to_table = 'pricing' AND l.to_id = p.id "
+                    "    AND l.field = '航线报价') "
+                    "  OR EXISTS (SELECT 1 FROM biz_link l WHERE l.from_table = 'pricing' "
+                    "    AND l.from_id = p.id AND l.to_table = 'opportunity' AND l.to_id = :oid "
+                    "    AND l.field = '关联商机')"
+                    ") "
                     "ORDER BY p.update_time DESC, p.id DESC"
                 ),
                 {"oid": opportunity_id},
@@ -6862,10 +6900,16 @@ async def get_opportunity_plans(opportunity_id: int) -> dict[str, Any]:
         rows = (
             await session.execute(
                 text(
-                    "SELECT p.* FROM biz_link l "
-                    "JOIN biz_plan p ON p.id = l.to_id AND p.is_deleted = 0 "
-                    "WHERE l.from_table = 'opportunity' AND l.from_id = :oid "
-                    "  AND l.to_table = 'plan' AND l.field = '对客方案' "
+                    "SELECT p.* FROM biz_plan p "
+                    "WHERE p.is_deleted = 0 AND ("
+                    # 同 get_opportunity_pricing：双向关联哪一侧有值都认
+                    "  EXISTS (SELECT 1 FROM biz_link l WHERE l.from_table = 'opportunity' "
+                    "    AND l.from_id = :oid AND l.to_table = 'plan' AND l.to_id = p.id "
+                    "    AND l.field = '对客方案') "
+                    "  OR EXISTS (SELECT 1 FROM biz_link l WHERE l.from_table = 'plan' "
+                    "    AND l.from_id = p.id AND l.to_table = 'opportunity' AND l.to_id = :oid "
+                    "    AND l.field = '关联商机')"
+                    ") "
                     "ORDER BY p.id DESC"
                 ),
                 {"oid": opportunity_id},

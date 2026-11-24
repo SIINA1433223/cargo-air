@@ -1532,6 +1532,13 @@ class MyPasswordBody(BaseModel):
     new_password: str = Field(..., min_length=6, max_length=64)
 
 
+@WeidaRouter.get("/me", summary="当前登录人（工作台入口按它定可见范围）")
+async def me_profile(auth: Annotated[AuthSchema, Depends(get_current_user)]) -> Any:
+    from .service import current_staff_profile
+
+    return SuccessResponse(data=await current_staff_profile(auth.user))
+
+
 @WeidaRouter.post("/me/password", summary="修改本人密码", response_model=ResponseSchema[None])
 async def me_change_password(
     body: MyPasswordBody,

@@ -228,6 +228,16 @@ LINK_PAIRS = {
 }
 
 
+# 反向写法归一：飞书双向关联在两边表里各回一份，落到本地必须按**页面读的那个方向**
+# 再补一行（否则「关联商机」写进来的报价，客服抽屉按「航线报价」读不到 ——
+# 用户 2026-11-24 报的 OP-2611649/11654/11655/11656 就是这种）。
+# key = (from_key, to_key, 原 field)，value = (canonical from_key, to_key, field)。
+CANONICAL_LINKS = {
+    ("pricing", "opportunity", "关联商机"): ("opportunity", "pricing", "航线报价"),
+    ("plan", "opportunity", "关联商机"): ("opportunity", "plan", "对客方案"),
+}
+
+
 async def sync_links(session, local: str, items: list[dict[str, Any]]) -> int:
     """按飞书关联字段把 biz_link 补齐（幂等，只增不删，方向按 canonical）。"""
     pairs = {f: spec for (tbl, f), spec in LINK_PAIRS.items() if tbl == local}
@@ -269,6 +279,17 @@ async def sync_links(session, local: str, items: list[dict[str, Any]]) -> int:
                     {"f": link_field, "ft": from_key, "fid": src, "tt": to_key, "tid": dst},
                 )
                 written += 1
+                canonical = CANONICAL_LINKS.get((from_key, to_key, link_field))
+                if canonical:
+                    cft, ctt, cfield = canonical
+                    await session.execute(
+                        text(
+                            "INSERT INTO biz_link (field, from_table, from_id, to_table, to_id) "
+                            "VALUES (:f, :ft, :fid, :tt, :tid) ON DUPLICATE KEY UPDATE id = id"
+                        ),
+                        {"f": cfield, "ft": cft, "fid": src, "tt": ctt, "tid": dst},
+                    )
+                    written += 1
     return written
 
 
