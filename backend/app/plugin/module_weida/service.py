@@ -1850,6 +1850,18 @@ async def list_records(
                         item["alerts"] = fleet_alerts
                 elif int(item["id"]) in alerts:
                     item["alerts"] = alerts[int(item["id"])]
+        if wb.role == "customer_service":
+            # 货物数据 = 件数/毛重/体积（换行）尺寸 —— 与订单、Java 引擎同一口径
+            for item, row in zip(items, rows):
+                pieces = _num_text(row.get("piece_count"))
+                gross = _num_text(row.get("gross_weight_kg"))
+                volume = _num_text(row.get("volume_m3"))
+                size = str(row.get("size_length_width_height_quantity") or "").strip()
+                if gross and volume:
+                    text_value = f"{pieces}/{gross}/{volume}"
+                    if size:
+                        text_value += "\n" + size
+                    item["fields"]["goods_data"] = {"label": "货物数据", "value": text_value}
         status = await _status_map(session, wb, rows)
         for item in items:
             value = status.get(int(item["id"]))
