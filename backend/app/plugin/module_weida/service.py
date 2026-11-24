@@ -3069,8 +3069,9 @@ async def get_dashboard(
                 and start <= r["warehouse_in_operation_time"].date() <= end
             )
             history_week.append({"name": start.strftime("%m-%d"), "value": count})
+        # 历史月包含**当前月**（以前末尾停在上一月，本月永远不出现）
         for i in range(5, -1, -1):
-            month = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+            month = today.replace(day=1)
             for _ in range(i):
                 month = (month - timedelta(days=1)).replace(day=1)
             count = sum(
@@ -3081,15 +3082,17 @@ async def get_dashboard(
             )
             history_month.append({"name": month.strftime("%Y-%m"), "value": count})
         operator_table = []
-        for name in sorted({str(r.get("domestic_operation") or "未分配").strip() or "未分配" for r in rows}):
-            current = [r for r in rows if (str(r.get("domestic_operation") or "未分配").strip() or "未分配") == name]
-            week_count = sum(1 for r in current if isinstance(r.get("warehouse_in_operation_time"), datetime) and ops_week_from <= r["warehouse_in_operation_time"] <= ops_week_to)
-            month_count = sum(1 for r in current if isinstance(r.get("warehouse_in_operation_time"), datetime) and r["warehouse_in_operation_time"] >= month_from)
+        operator_names = sorted(
+            {ops_owner(r) for r in rows if ops_owner(r)} | set(week_by) | set(month_by)
+        )
+        for name in operator_names:
+            current = [r for r in rows if ops_owner(r) == name]
             done = sum(1 for r in current if r.get("send_forecast") in (1, True))
             operator_table.append({
                 "name": name,
-                "week": week_count,
-                "month": month_count,
+                # 周/月跟卡片同一个口径（iFreight 记录数），不再按订单入仓时间另算一套
+                "week": week_by.get(name, 0),
+                "month": month_by.get(name, 0),
                 "pending": len(current) - done,
                 "done": done,
             })
