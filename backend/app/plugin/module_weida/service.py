@@ -4912,6 +4912,13 @@ async def send_action_mail(order_id: int, kind: str) -> dict[str, Any]:
             )
         await session.commit()
     await publish_event(table="biz_order", record_id=order_id, fields=["send_pickup_email"], actor=None)
+    # 头程提货邮件点完要顺带按先达规矩同步（勾选框是直接 UPDATE 写的，
+    # 走不到 update_record 里那条 xanda 钩子，这里显式补一次）
+    if kind == "pickup":
+        try:
+            await xanda_sync_order(order_id)
+        except Exception:
+            pass
     return {"kind": kind, "to": "weida-tao@foxmail.com", "attachments": len(files)}
 
 

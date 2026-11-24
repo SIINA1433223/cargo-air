@@ -7697,12 +7697,22 @@ const activeAttachField = ref('')
 
 async function onGlobalPaste(event: ClipboardEvent) {
   if (!drawerOpen.value || !activeAttachField.value) return
-  const files = Array.from(event.clipboardData?.files || [])
+  const data = event.clipboardData
+  if (!data) return
+  // 截图/复制的图片在 items 里，files 经常是空的 —— 两处都取
+  const fromItems = Array.from(data.items || [])
+    .filter((item) => item.kind === 'file')
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => !!file)
+  const files = fromItems.length ? fromItems : Array.from(data.files || [])
   if (!files.length) return
   event.preventDefault()
+  const field = activeAttachField.value
   for (const file of files) {
-    await uploadDetailAttachment(activeAttachField.value, { file, onSuccess: () => {}, onError: () => {} })
+    await uploadDetailAttachment(field, { file, onSuccess: () => {}, onError: () => {} })
   }
+  // 上传完再拉一次这一格的列表（截图走 items 分支时个别浏览器不回 files）
+  await loadDetailAttachment(field)
 }
 
 onMounted(async () => {
