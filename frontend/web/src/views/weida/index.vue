@@ -7675,13 +7675,19 @@ async function saveDetail() {
   }
   // 对客方案的两道门禁（妙搭 resultGates / resultRules）：
   //   拿到货=是 之前必须先选定「最终对客方案」；拿到货=否 必须写「未拿到货备注」。
+  //
+  // 只在**这次真的把「是否拿到货」改成了那一档**时拦（用户 2026-11-24：老数据里已经
+  // 是「否」但没写备注的票，改任何别的字段都被这两句挡住，等于这票永远保存不了）。
+  // 判据跟妙搭一致：规则管的是「切换的那一刻」，不是每次保存都重判库存值。
   if (role.value === 'customer_service' && drawerMode.value === 'edit') {
     const got = String(editModel.is_goods_received ?? '')
-    if (got === '是' && !editModel.final_plan_id) {
+    const prevGot = String(detail.value?.fields.is_goods_received?.value ?? '')
+    const changed = got !== prevGot
+    if (changed && got === '是' && !editModel.final_plan_id) {
       ElMessage.warning('请先选择「最终对客方案」，再把「是否拿到货」设为「是」')
       return
     }
-    if (got === '否' && !String(editModel.goods_not_received_remark ?? '').trim()) {
+    if (changed && got === '否' && !String(editModel.goods_not_received_remark ?? '').trim()) {
       ElMessage.warning('「是否拿到货」选了「否」，「未拿到货备注」必须填写')
       return
     }
