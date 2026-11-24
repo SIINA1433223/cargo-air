@@ -7725,6 +7725,19 @@ onMounted(async () => {
   restoreConfigCache()
   restoreRowsCache()
   await Promise.all([loadAccountState(), loadConfig()])
+  // 没指定 role 时（直接进 /weida）按登录人身份落到自己的台子，
+  // 否则默认落成客服台，碰巧本人名下没有商机就会看起来「登录之后没有数据」。
+  const seg = String(route.params.role || '')
+  const staffRole = String((config.value as any)?.current_staff?.role || '')
+  const rolePath: Record<string, string> = {
+    customer_service: 'customer-service',
+    pricing: 'pricing',
+    domestic_ops: 'domestic-ops',
+  }
+  if (!seg && rolePath[staffRole]) {
+    router.replace(`/weida/${rolePath[staffRole]}`)
+    return
+  }
   await load()
   void loadVendors()
   void loadStaffOptions()
