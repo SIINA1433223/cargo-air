@@ -21,7 +21,6 @@
             <a-button size="small" @click="openNotifications">通知</a-button>
           </a-badge>
 
-          <a-button class="wb-t-textcolor" size="small" @click="textColorOpen = true">字色</a-button>
           <a-select
             v-if="savedViews.length"
             v-model:value="activeViewId"
@@ -50,28 +49,51 @@
             新建商机
           </a-button>
           <a-button class="wb-t-columns" size="small" @click="columnOpen = true">自定义列</a-button>
-          <!-- 上色：Excel 式「勾选行 → 点颜色」，不再用飞书那套条件格式（用户 2026-11-24） -->
-          <el-popover placement="bottom" :width="252" trigger="click">
-            <template #reference>
-              <a-button class="wb-t-paint" size="small">上色</a-button>
-            </template>
-            <div class="wb-fill-panel">
-              <p class="wb-fill-tip">先勾选左边的行，再点颜色；整行上色，只影响你自己的界面。</p>
-              <div class="wb-fill-grid">
-                <button
-                  v-for="c in FILL_PRESETS"
-                  :key="c"
-                  type="button"
-                  class="wb-fill-dot"
-                  :style="{ backgroundColor: c }"
-                  :title="c"
-                  @click="applyFill(c)" />
+          <a-button class="wb-t-paint" size="small" @click="paintOpen = true">填色</a-button>
+          <!-- 字色：照妙搭的做法 —— 先点一格 / 行号 / 列头选范围，再上色（用户 2026-11-24） -->
+          <div class="wb-text-wrap">
+            <a-button class="wb-t-textcolor" size="small" @click="textColorOpen = !textColorOpen">字色</a-button>
+            <div v-if="textColorOpen" class="wb-text-pop">
+              <div class="wb-text-panel">
+                <p class="wb-col-tip">{{ styleTargetLabel }}</p>
+                <div class="wb-text-grid">
+                  <button
+                    v-for="p in TEXT_COLOR_PRESETS"
+                    :key="p.hex"
+                    type="button"
+                    class="wb-text-dot"
+                    :style="{ color: p.hex }"
+                    :title="p.label"
+                    @click="applyTextStyle({ color: p.hex })">
+                    A
+                  </button>
+                </div>
+                <div class="wb-text-tools">
+                  <el-button size="small" :class="{ 'is-on': !!currentTargetStyle.bold }" @click="applyTextStyle({ bold: !currentTargetStyle.bold })">
+                    <b>B</b>
+                  </el-button>
+                  <el-button size="small" :class="{ 'is-on': !!currentTargetStyle.italic }" @click="applyTextStyle({ italic: !currentTargetStyle.italic })">
+                    <i>I</i>
+                  </el-button>
+                  <el-select
+                    :model-value="currentTargetStyle.size"
+                    size="small"
+                    placeholder="字号"
+                    clearable
+                    style="width: 92px"
+                    @change="(v: any) => applyTextStyle({ size: v ?? undefined })">
+                    <el-option label="12" :value="12" />
+                    <el-option label="14" :value="14" />
+                    <el-option label="16" :value="16" />
+                  </el-select>
+                </div>
+                <div class="wb-text-foot">
+                  <el-button size="small" @click="clearAllTextStyles">清空字色与字号</el-button>
+                  <el-button size="small" type="primary" plain @click="textColorOpen = false">收起</el-button>
+                </div>
               </div>
-              <el-button size="small" style="margin-top: 10px; width: 100%" @click="applyFill('')">
-                清除选中行的颜色
-              </el-button>
             </div>
-          </el-popover>
+          </div>
           <!-- 比例调整：只缩放索引页表格（弹窗、抽屉不受影响），按账号记本机。
                可以无限往小调（用户 2026-11-24），下限只挡住 0。 -->
           <el-input-number
@@ -92,6 +114,7 @@
                 <a-menu-divider />
                 <a-menu-item key="create">新建</a-menu-item>
                 <a-menu-item key="columns">自定义列</a-menu-item>
+                <a-menu-item key="paint">填色（{{ paintRules.length }}）</a-menu-item>
                 <a-menu-item key="password">修改密码</a-menu-item>
                 <a-menu-item key="logout">退出登录</a-menu-item>
                 <a-menu-item key="refresh" :disabled="loading">刷新</a-menu-item>
@@ -263,14 +286,15 @@
             :loading="loading"
             :pagination="false"
             :row-key="(record: Row) => record.id"
-            :row-selection="rowSelection"
             :custom-row="antCustomRow"
             :scroll="{ x: 'max-content', y: tableScrollY }"
             size="small"
             bordered>
             <template #bodyCell="{ column, record, index }">
               <div class="wb-cell-clip">
-              <template v-if="column.key === '__index'">{{ index + 1 }}</template>
+              <template v-if="column.key === '__index'">
+                <span class="wb-row-num" @click.stop="onRowNumClick(record)">{{ index + 1 }}</span>
+              </template>
               <template v-else-if="column.key === '__status'">
                 <div
                   class="wb-status-cell"
@@ -2253,18 +2277,6 @@
       </div>
     </el-dialog>
 
-    <el-dialog v-model="textColorOpen" title="字色（整列）" width="460px">
-      <div class="wb-textcolor">
-        <el-select v-model="textColorColumn" placeholder="选择列" filterable style="width: 220px">
-          <el-option v-for="c in displayColumns.filter((x) => x.kind === 'field')" :key="c.key" :label="c.label" :value="(c as any).column" />
-        </el-select>
-        <el-color-picker v-model="textColorValue" />
-        <el-button type="primary" @click="applyTextColor">应用</el-button>
-        <el-button @click="clearTextColor">清除</el-button>
-      </div>
-      <p class="wb-col-tip">只改这一列的文字颜色，并按账号保存。</p>
-    </el-dialog>
-
     <el-dialog v-model="columnOpen" title="自定义列" width="680px">
       <p class="wb-col-tip">只影响你自己的界面，配置保存在本机；同事看到的不变。</p>
       <div class="wb-col-row">
@@ -2358,9 +2370,9 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="paintOpen" title="填色 / 字色（条件格式）" width="920px">
+    <el-dialog v-model="paintOpen" title="填色（条件格式）" width="900px">
       <p class="wb-col-tip">
-        满足条件自动上色，只影响你自己的界面。规则自上而下先命中先着色；整列不看条件，整列都涂。
+        满足条件就自动上色，会覆盖「单票状态」那层底色。只在你自己界面生效（存本机）。
       </p>
       <div class="wb-paint-list">
         <div v-for="(r, i) in paintDraft" :key="r.id" class="wb-paint-row">
@@ -2369,57 +2381,55 @@
             <el-radio-button label="row">整行</el-radio-button>
             <el-radio-button label="column">整列</el-radio-button>
           </el-radio-group>
-          <el-select v-model="r.column" filterable placeholder="列" class="wb-filter-col">
+          <el-select
+            v-model="r.column"
+            filterable
+            placeholder="列…"
+            class="wb-filter-col"
+            @change="onPaintFieldChange(r)">
             <el-option v-for="c in displayColumns" :key="c.key" :label="c.label" :value="c.key" />
           </el-select>
-          <template v-if="r.scope !== 'column'">
-            <el-select v-model="r.op" class="wb-op">
-              <el-option v-for="op in paintOps(r.column)" :key="op.value" :label="op.label" :value="op.value" />
-            </el-select>
-            <el-date-picker
-              v-if="r.op === 'date_on' || r.op === 'date_before' || r.op === 'date_after'"
-              v-model="r.value"
-              type="date"
-              value-format="YYYY-MM-DD"
-              placeholder="日期"
-              class="wb-filter-val" />
-            <el-input
-              v-else-if="!isValueless(r.op)"
-              v-model="r.value"
-              placeholder="值"
-              class="wb-filter-val" />
-          </template>
-          <span v-else class="cell-empty">整列上色</span>
-          <el-color-picker v-model="r.color" size="small" title="底色" />
-          <el-input v-model="r.color" placeholder="底色 #hex / rgb()" style="width: 150px" />
+          <el-select v-model="r.op" class="wb-op" :disabled="r.scope === 'column'" @change="onPaintOpChange(r)">
+            <el-option v-for="op in paintOps(r.column)" :key="op.value" :label="op.label" :value="op.value" />
+          </el-select>
+          <el-select
+            v-if="isPaintCheckbox(r.column) && r.scope !== 'column' && r.op === 'eq'"
+            v-model="r.value"
+            class="wb-filter-val">
+            <el-option label="是（已勾选）" value="是" />
+            <el-option label="否（未勾选）" value="否" />
+          </el-select>
+          <el-input
+            v-else
+            v-model="r.value"
+            placeholder="值"
+            class="wb-filter-val"
+            :disabled="r.scope === 'column' || isValueless(r.op)" />
+          <span v-if="r.scope === 'column'" class="cell-empty">整列：不看条件，整列都涂</span>
           <div class="wb-color-presets">
             <button
-              v-for="c in PAINT_PRESETS"
-              :key="c"
+              v-for="p in PAINT_PRESETS"
+              :key="p.hex"
               type="button"
               class="wb-color-dot"
-              :style="{ backgroundColor: c }"
-              :title="c"
-              @click="r.color = c" />
+              :class="{ 'is-on': String(r.color).toLowerCase() === p.hex }"
+              :style="{ backgroundColor: p.hex }"
+              :title="p.label"
+              @click="r.color = p.hex" />
           </div>
-          <el-color-picker v-model="r.textColor" size="small" title="字色" />
-          <el-input v-model="r.textColor" placeholder="字色 #hex / rgb()" style="width: 150px" />
-          <el-checkbox v-model="r.bold">B</el-checkbox>
-          <el-checkbox v-model="r.italic">I</el-checkbox>
-          <el-select v-model="r.fontSize" placeholder="字号" style="width: 78px" clearable>
-            <el-option label="12" :value="12" />
-            <el-option label="14" :value="14" />
-            <el-option label="16" :value="16" />
-          </el-select>
-          <el-button link :disabled="i === 0" @click="movePaint(i, -1)">上移</el-button>
-          <el-button link :disabled="i === paintDraft.length - 1" @click="movePaint(i, 1)">下移</el-button>
+          <el-color-picker v-model="r.color" size="small" title="自定义颜色" />
+          <el-button link :disabled="i === 0" @click="movePaint(i, -1)">↑</el-button>
+          <el-button link :disabled="i === paintDraft.length - 1" @click="movePaint(i, 1)">↓</el-button>
           <el-button link type="danger" @click="paintDraft.splice(i, 1)">删除</el-button>
         </div>
-        <p v-if="!paintDraft.length" class="wb-col-empty">还没有规则。</p>
+        <p v-if="!paintDraft.length" class="wb-col-empty">还没有规则，点下面「加一条」。</p>
       </div>
-      <el-button @click="addPaintRule">+ 加一条</el-button>
+      <div class="wb-paint-foot">
+        <el-button @click="addPaintRule">+ 加一条</el-button>
+        <span class="wb-col-tip">自上而下先命中先着色 —— 有重叠时排前面的赢。</span>
+      </div>
       <template #footer>
-        <el-button @click="paintDraft = []">清空全部</el-button>
+        <el-button link class="wb-paint-clear" @click="paintDraft = []">清空全部规则</el-button>
         <el-button @click="paintOpen = false">取消</el-button>
         <el-button type="primary" @click="savePaintRules">保存</el-button>
       </template>
@@ -2860,6 +2870,73 @@ const cellTextStyles = ref<Record<string, TextStyle>>({})
 const rowTextStyles = ref<Record<string, TextStyle>>({})
 const columnTextStyles = ref<Record<string, TextStyle>>({})
 
+/**
+ * 「字色」浮层：照妙搭的口径 —— 先把范围点出来（单元格 / 整行 / 整列），
+ * 再上文字色、加粗、斜体、字号。跟条件填色是两套东西：这边是手动、那边是规则。
+ */
+type StyleTarget =
+  | { kind: 'cell'; rowKey: string; colKey: string; rowId: number }
+  | { kind: 'row'; rowKey: string; rowId: number }
+  | { kind: 'column'; colKey: string }
+const styleTarget = ref<StyleTarget | null>(null)
+const styleTargetLabel = computed(() => {
+  const t = styleTarget.value
+  if (!t) return '先点一格 / 行号 / 列头选定范围'
+  if (t.kind === 'cell') return `已选：${displayColumns.value.find((c) => c.key === t.colKey)?.label || t.colKey}`
+  if (t.kind === 'row') return '已选：一行'
+  return `已选：整列 ${displayColumns.value.find((c) => c.key === t.colKey)?.label || t.colKey}`
+})
+const currentTargetStyle = computed<TextStyle>(() => {
+  const t = styleTarget.value
+  if (!t) return {}
+  if (t.kind === 'cell') return cellTextStyles.value[`${t.rowKey}:${t.colKey}`] || {}
+  if (t.kind === 'row') return rowTextStyles.value[t.rowKey] || {}
+  return columnTextStyles.value[t.colKey] || {}
+})
+
+function selectStyleTarget(row: Row, key: string) {
+  const rowKey = recordKey(row)
+  if (key === '__index') {
+    styleTarget.value = { kind: 'row', rowKey, rowId: row.id }
+  } else {
+    styleTarget.value = { kind: 'cell', rowKey, colKey: key, rowId: row.id }
+  }
+}
+
+function selectStyleColumn(key: string) {
+  if (!textColorOpen.value) return
+  if (key === '__index' || key === '__status' || key === '__view_left') return
+  styleTarget.value = { kind: 'column', colKey: key }
+}
+
+function applyTextStyle(patch: TextStyle) {
+  const t = styleTarget.value
+  if (!t) {
+    ElMessage.info('先点一格 / 行号 / 列头选定范围')
+    return
+  }
+  const merge = (source: Record<string, TextStyle>, key: string) => {
+    const next: TextStyle = { ...(source[key] || {}), ...patch }
+    for (const prop of ['color', 'bold', 'italic', 'size'] as const) {
+      if (next[prop] === undefined) delete next[prop]
+    }
+    if (Object.keys(next).length) source[key] = next
+    else delete source[key]
+  }
+  if (t.kind === 'cell') merge(cellTextStyles.value, `${t.rowKey}:${t.colKey}`)
+  else if (t.kind === 'row') merge(rowTextStyles.value, t.rowKey)
+  else merge(columnTextStyles.value, t.colKey)
+  saveColumns()
+}
+
+function clearAllTextStyles() {
+  cellTextStyles.value = {}
+  rowTextStyles.value = {}
+  columnTextStyles.value = {}
+  saveColumns()
+  ElMessage.success('已清空字色与字号')
+}
+
 /** 一行的稳定键：优先飞书 record_id（妙搭配置按它存），老的没有就退回本地 id。 */
 function recordKey(row: Row): string {
   return String(row.feishu_record_id || row.id)
@@ -2963,56 +3040,33 @@ const inlineCalcVolume = ref<number | null>(null)
 const inlineEdit = ref<InlineEdit | null>(null)
 const inlineEditValue = ref('')
 const inlineSaving = ref(false)
-/**
- * Excel 式手动上色（用户 2026-11-24 要的）：勾行 → 点颜色，整行铺底色。
- * 存在本机 `weida_row_fills:<role>`，键是行的稳定键（飞书 record_id）。
- */
-const FILL_PRESETS = ['#fff3bf', '#ffe3e3', '#d3f9d8', '#d0ebff', '#e5dbff', '#ffe8cc', '#f1f3f5']
-const manualFills = ref<Record<string, string>>({})
-const selectedRowKeys = ref<any[]>([])
-const rowSelection = computed(() => ({
-  selectedRowKeys: selectedRowKeys.value,
-  columnWidth: 36,
-  onChange: (keys: any[]) => {
-    selectedRowKeys.value = keys
-  },
-}))
-function restoreManualFills() {
-  try {
-    const raw = localStorage.getItem(`weida_row_fills:${role.value}`)
-    manualFills.value = raw ? JSON.parse(raw) : {}
-  } catch {
-    manualFills.value = {}
-  }
-}
-function applyFill(color: string) {
-  if (!selectedRowKeys.value.length) {
-    ElMessage.info('先勾选要上色的行')
-    return
-  }
-  const next = { ...manualFills.value }
-  for (const key of selectedRowKeys.value) {
-    const row = rows.value.find((r) => r.id === key)
-    if (!row) continue
-    const rk = recordKey(row)
-    if (color) next[rk] = color
-    else delete next[rk]
-  }
-  manualFills.value = next
-  localStorage.setItem(`weida_row_fills:${role.value}`, JSON.stringify(next))
-  ElMessage.success(color ? '已上色' : '已清除颜色')
-}
-
+/** 填色预设，与妙搭 ConditionalFormatDialog 一字不差（不透明浅色，压得住状态罩）。 */
 const PAINT_PRESETS = [
-  '#fde68a',
-  '#bbf7d0',
-  '#bfdbfe',
-  '#a5f3fc',
-  '#e9d5ff',
-  '#fbcfe8',
-  '#fed7aa',
-  '#fecaca',
-  '#e5e7eb',
+  { label: '黄', hex: '#fde68a' },
+  { label: '绿', hex: '#bbf7d0' },
+  { label: '蓝', hex: '#bfdbfe' },
+  { label: '青', hex: '#a5f3fc' },
+  { label: '紫', hex: '#e9d5ff' },
+  { label: '粉', hex: '#fbcfe8' },
+  { label: '橙', hex: '#fed7aa' },
+  { label: '红', hex: '#fecaca' },
+  { label: '灰', hex: '#e5e7eb' },
+]
+
+/** 字色预设：妙搭 PAINT_PRESETS（600 档鲜艳色，配加粗最实用）。 */
+const TEXT_COLOR_PRESETS = [
+  { label: '红', hex: '#dc2626' },
+  { label: '橙', hex: '#ea580c' },
+  { label: '琥珀', hex: '#d97706' },
+  { label: '黄绿', hex: '#65a30d' },
+  { label: '绿', hex: '#16a34a' },
+  { label: '青', hex: '#0d9488' },
+  { label: '天蓝', hex: '#0891b2' },
+  { label: '蓝', hex: '#2563eb' },
+  { label: '紫', hex: '#7c3aed' },
+  { label: '品红', hex: '#c026d3' },
+  { label: '玫红', hex: '#e11d48' },
+  { label: '灰蓝', hex: '#475569' },
 ]
 const STATUS_TINTS: Record<string, string> = {
   未拿到货: 'rgba(210, 168, 24, 0.30)',
@@ -3239,6 +3293,8 @@ const antColumns = computed<any[]>(() => {
         onDragstart: (event: DragEvent) => startColumnDrag(event, c.key),
         onDragover: (event: DragEvent) => event.preventDefault(),
         onDrop: (event: DragEvent) => dropColumn(event, c.key),
+        // 字色浮层开着时，点列头 = 选中整列
+        onClick: () => selectStyleColumn(c.key),
         onMousedown: (event: MouseEvent) => {
           const target = event.currentTarget as HTMLElement
           if (target && target.getBoundingClientRect().right - event.clientX <= 8) {
@@ -3416,8 +3472,6 @@ const dashDetailOpen = ref(false)
 const dashDetailTitle = ref('')
 const dashDetailRows = ref<Array<Record<string, any>>>([])
 const textColorOpen = ref(false)
-const textColorColumn = ref('')
-const textColorValue = ref('')
 const columnTextColors = ref<Record<string, string>>({})
 const notifications = ref<Array<Record<string, any>>>([])
 const unreadCount = ref(0)
@@ -4254,7 +4308,6 @@ async function loadConfig() {
   maybeSeedViewConfig()
   restoreViewConfig()
   restoreFilterViews()
-  restoreManualFills()
 }
 
 /**
@@ -4509,26 +4562,6 @@ function onSortChange({ prop, order }: { prop: string; order: string | null }) {
 function setColumnWidth(key: string, width: number | undefined) {
   if (!width) return
   columnWidths.value = { ...columnWidths.value, [key]: Math.round(width) }
-}
-
-function applyTextColor() {
-  if (!textColorColumn.value || !textColorValue.value) return
-  columnTextColors.value = {
-    ...columnTextColors.value,
-    [textColorColumn.value]: textColorValue.value,
-  }
-  localStorage.setItem(`weida_text_colors:${role.value}`, JSON.stringify(columnTextColors.value))
-  void syncPref('text_colors', columnTextColors.value)
-  textColorOpen.value = false
-}
-
-function clearTextColor() {
-  if (!textColorColumn.value) return
-  const next = { ...columnTextColors.value }
-  delete next[textColorColumn.value]
-  columnTextColors.value = next
-  localStorage.setItem(`weida_text_colors:${role.value}`, JSON.stringify(next))
-  void syncPref('text_colors', next)
 }
 
 function saveRowHeight() {
@@ -4892,24 +4925,52 @@ async function saveStaff() {
   }
 }
 
-function paintOps(key: string) {
+// 条件填色的操作符与妙搭一致：普通列只有 空/非空/等于/包含；勾选框换成 等于/未勾选/已勾选。
+const PAINT_TEXT_OPS = [
+  { label: '为空', value: 'is_empty' },
+  { label: '非空', value: 'is_not_empty' },
+  { label: '等于', value: 'eq' },
+  { label: '包含', value: 'contains' },
+]
+const PAINT_CHECK_OPS = [
+  { label: '等于', value: 'eq' },
+  { label: '未勾选', value: 'is_empty' },
+  { label: '已勾选', value: 'is_not_empty' },
+]
+
+function paintColumnType(key: string): string {
   const c = displayColumns.value.find((x) => x.key === key)
-  if (c?.kind === 'field') return opsFor(c.column)
-  return TEXT_OPS
+  return c?.kind === 'field' ? String(c.type || '') : ''
+}
+
+function isPaintCheckbox(key: string): boolean {
+  return paintColumnType(key) === 'checkbox'
+}
+
+function paintOps(key: string) {
+  return isPaintCheckbox(key) ? PAINT_CHECK_OPS : PAINT_TEXT_OPS
+}
+
+/** 换列时把值按新列重置：勾选框给「是」，别的清空（妙搭同一口径）。 */
+function onPaintFieldChange(rule: PaintRule) {
+  rule.op = 'eq'
+  rule.value = isPaintCheckbox(rule.column) ? '是' : ''
+}
+
+/** 切到勾选框的「等于」时补一个能命中的默认值。 */
+function onPaintOpChange(rule: PaintRule) {
+  if (isPaintCheckbox(rule.column) && rule.op === 'eq' && !rule.value) rule.value = '是'
 }
 
 function addPaintRule() {
+  const first = displayColumns.value[0]?.key || ''
   paintDraft.value.push({
     id: `${Date.now()}-${Math.random()}`,
-    scope: 'cell',
-    column: displayColumns.value[0]?.key || '',
-    op: 'contains',
-    value: '',
+    scope: 'row',
+    column: first,
+    op: 'eq',
+    value: isPaintCheckbox(first) ? '是' : '',
     color: '#fde68a',
-    textColor: '',
-    bold: false,
-    italic: false,
-    fontSize: undefined,
   })
 }
 
@@ -5040,12 +5101,31 @@ function statusPillStyle(value: string) {
   }
 }
 
+/** 勾选框的「值」认 是/否 与 true/false/1/0（老规则、飞书原文都能命中）。 */
+function checkboxWanted(value: any): boolean | null {
+  const v = String(value ?? '').trim().toLowerCase()
+  if (['是', 'true', '1', 'yes', 'y', '✓', '已勾选'].includes(v)) return true
+  if (['否', 'false', '0', 'no', 'n', '未勾选'].includes(v)) return false
+  return null
+}
+
 function paintMatch(rule: PaintRule, row: Row): boolean {
   if (rule.scope === 'column') return true
   const value = ruleValue(row, rule.column)
+  // 勾选框单独一条路（妙搭同款）：勾上 = 非空、没勾 = 为空；等于认 是/否 各种写法。
+  if (isPaintCheckbox(rule.column)) {
+    const checked = value === 1 || value === true || value === '1' || checkboxWanted(value) === true
+    if (rule.op === 'is_empty') return !checked
+    if (rule.op === 'is_not_empty') return checked
+    if (rule.op === 'eq' || rule.op === 'contains') {
+      const want = checkboxWanted(rule.value)
+      return want === null ? false : checked === want
+    }
+    return true
+  }
   if (rule.op === 'is_empty') return isEmpty(value)
   if (rule.op === 'is_not_empty') return !isEmpty(value)
-  if (rule.op === 'eq') return String(value ?? '') === String(rule.value ?? '')
+  if (rule.op === 'eq') return String(value ?? '').trim() === String(rule.value ?? '').trim()
   if (rule.op === 'ne') return String(value ?? '') !== String(rule.value ?? '')
   if (rule.op === 'contains') return String(value ?? '').includes(String(rule.value ?? ''))
   if (rule.op === 'gt') return Number(value) > Number(rule.value)
@@ -5072,23 +5152,12 @@ function rowTint(row: Row): string | undefined {
 function paintCellStyle({ row, column }: { row: Row; column: any }) {
   const key = String(column?.property || '')
   if (!key) return {}
-  // 手动上色优先级最高：勾选行点过的颜色盖过自动底色与旧条件规则。
-  const manual = manualFills.value[recordKey(row)]
-  if (manual) {
-    return {
-      backgroundColor: manual,
-      ...(columnTextColors.value[key] ? { color: columnTextColors.value[key] } : {}),
-    }
-  }
   const statusColor = rowTint(row)
-  // 客服工作台：条件填色一律按「整行」算（用户 2026-11-24）。
-  // 以前配成「单元格」的规则也跟着整行上色，不用逐条改。
-  const rowWide = role.value === 'customer_service'
+  // 完全按妙搭的条件格式来：单元格 / 整行 / 整列 各按配置走，不做额外改写。
   for (const rule of paintRules.value) {
-    const scope = rowWide && rule.scope === 'cell' ? 'row' : rule.scope
-    if (scope === 'column') {
+    if (rule.scope === 'column') {
       if (rule.column !== key) continue
-    } else if (scope === 'cell' && rule.column !== key) {
+    } else if (rule.scope === 'cell' && rule.column !== key) {
       continue
     } else if (!paintMatch(rule, row)) {
       continue
@@ -5141,9 +5210,6 @@ const INLINE_READONLY = new Set([
   'goods_data',
   'final_plan',
   'bill_status',
-  'opportunity_no',
-  'plan_no',
-  'master_no', // 查找引用：改的是关联订单，不能在商机行里就地写
   'create_time',
   'update_time',
   'id',
@@ -5162,9 +5228,19 @@ function setInlineDate(value: any, format: string, text?: string) {
   void saveInlineEdit()
 }
 
+function onRowNumClick(row: Row) {
+  // 字色浮层开着时，点行号 = 选中整行（妙搭同款）
+  if (textColorOpen.value) styleTarget.value = { kind: 'row', rowKey: recordKey(row), rowId: row.id }
+}
+
 function onCellClick(row: Row, column: any) {
   const key = String(column?.property || '')
   if (!key) return
+  // 字色浮层开着时，点格子只用来选范围，不进编辑
+  if (textColorOpen.value) {
+    selectStyleTarget(row, key)
+    return
+  }
   if (inlineEdit.value && inlineEdit.value.rowId === row.id && inlineEdit.value.key === key) return
   if (inlineEdit.value) void saveInlineEdit()
   const c = displayColumns.value.find((x) => x.key === key)
@@ -9401,28 +9477,75 @@ onUnmounted(() => {
 .wb-table :deep(.ant-table-content)::-webkit-scrollbar-thumb:hover {
   background: hsl(35 10% 55%);
 }
-.wb-fill-panel {
+.wb-row-num {
+  display: block;
+}
+.wb-paint-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+.wb-paint-clear {
+  float: left;
+}
+.wb-color-dot.is-on {
+  outline: 2px solid hsl(190 64% 26%);
+  outline-offset: 1px;
+}
+.wb-text-wrap {
+  position: relative;
+  display: inline-block;
+}
+.wb-text-pop {
+  position: absolute;
+  top: 30px;
+  left: 0;
+  z-index: 60;
+  width: 300px;
+  padding: 10px 12px;
+  border: 1px solid hsl(35 12% 78%);
+  border-radius: 8px;
+  background: hsl(40 59% 98%);
+  box-shadow: 0 6px 18px hsl(33 17% 10% / 0.12);
+}
+.wb-text-panel {
   padding: 2px 0;
 }
-.wb-fill-tip {
-  margin: 0 0 8px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: hsl(34 9% 44%);
+.wb-text-foot {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
 }
-.wb-fill-grid {
+.wb-text-foot .el-button {
+  flex: 1;
+}
+.wb-text-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 6px;
+  margin-top: 8px;
 }
-.wb-fill-dot {
-  width: 100%;
-  height: 26px;
+.wb-text-dot {
+  height: 28px;
   border: 1px solid hsl(35 12% 78%);
   border-radius: 6px;
+  background: hsl(40 59% 98%);
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
 }
-.wb-fill-dot:hover {
+.wb-text-dot:hover {
   border-color: hsl(190 64% 26%);
+}
+.wb-text-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.wb-text-tools .is-on {
+  border-color: hsl(190 64% 26%);
+  color: hsl(190 64% 26%);
 }
 </style>
