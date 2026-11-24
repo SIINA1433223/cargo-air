@@ -471,6 +471,11 @@
               <span v-else style="color: #6b7280">加载中…</span>
             </template>
           </a-table>
+          <!-- 常驻的横向滚动条：浏览器自带的滚动条在不少环境里会隐身，
+               这里单独做一条，永远贴在表格底下，和表体左右联动 -->
+          <div ref="hbarRef" class="wb-hbar" @scroll="onHbarScroll">
+            <div class="wb-hbar-inner" :style="{ width: hbarWidth + 'px' }"></div>
+          </div>
         </div>
 
         <div class="wb-foot">
@@ -2589,6 +2594,16 @@
               value-format="YYYY-MM-DD"
               placeholder="选择日期"
               style="width: 100%" />
+            <!-- 数字列必须是数字输入：飞书那边是 Number 字段，手打「4-5」这类会直接把
+                 数据库写崩（1366 Incorrect decimal value） -->
+            <el-input-number
+              v-else-if="f.kind === 'number'"
+              v-model="quoteForm[f.key]"
+              :precision="4"
+              :controls="false"
+              :min="0"
+              placeholder="数字"
+              style="width: 100%" />
             <el-input
               v-else
               v-model="quoteForm[f.key]"
@@ -3711,14 +3726,14 @@ const reviewBusy = ref(false)
 const quoteForm = reactive<Record<string, any>>({})
 const QUOTE_FIELDS = [
   { key: 'supplier', label: '供应商', kind: 'supplier' },
-  { key: 'cost_amount', label: '成本金额', kind: 'text' },
+  { key: 'cost_amount', label: '成本金额', kind: 'number' },
   { key: 'cost_currency', label: '成本币种', kind: 'currency' },
   { key: 'level_ratio_requirement', label: '等级、比例要求', kind: 'textarea' },
   { key: 'airline', label: '航空公司', kind: 'text' },
   { key: 'departure_port', label: '启运港', kind: 'port' },
   { key: 'destination_port', label: '目的港', kind: 'port' },
   { key: 'transit_point', label: '中转点', kind: 'ports' },
-  { key: 'estimated_transit_days', label: '预计运输时效（天）', kind: 'text' },
+  { key: 'estimated_transit_days', label: '预计运输时效（天）', kind: 'number' },
   { key: 'quotation_validity_period', label: '报价有效期', kind: 'date' },
   { key: 'earliest_flight_time', label: '最早航班时间', kind: 'date' },
   { key: 'latest_arrival_time', label: '最晚到港时间', kind: 'date' },
@@ -4478,6 +4493,32 @@ function tableRoot(): HTMLElement | null {
   return (root?.querySelector('.ant-table-body') as HTMLElement | null) ?? root
 }
 
+/**
+ * 常驻横向滚动条（用户 2026-11-24：数据不满一屏也必须有，且在最底下）。
+ * 表体自己那条在部分环境里不显示，所以这里单独渲染一条跟表体联动。
+ */
+const hbarRef = ref<HTMLElement | null>(null)
+const hbarWidth = ref(0)
+
+function refreshHbar() {
+  void nextTick(() => {
+    const el = tableRoot()
+    const bar = hbarRef.value
+    if (!el) return
+    const next = Math.max(el.scrollWidth, el.clientWidth)
+    if (hbarWidth.value !== next) hbarWidth.value = next
+    if (bar && Math.abs(bar.scrollLeft - el.scrollLeft) > 1) bar.scrollLeft = el.scrollLeft
+  })
+}
+
+function onHbarScroll() {
+  const bar = hbarRef.value
+  const el = tableRoot()
+  if (bar && el && Math.abs(el.scrollLeft - bar.scrollLeft) > 1) {
+    el.scrollLeft = bar.scrollLeft
+  }
+}
+
 function scrollTableToBottom() {
   // Ant 表体渲染晚于数据更新，多试几次，避免首次到底被后续布局覆盖。
   for (const delay of [0, 80, 250, 600, 1200]) {
@@ -4495,6 +4536,10 @@ function scrollTableToBottom() {
   }
 }
 
+watch([rows, columnWidths, tableZoom, rowHeights, displayColumns], () => refreshHbar(), {
+  deep: true,
+})
+
 function bindTableScroll() {
   nextTick(() => {
     const root = tableRoot()
@@ -4502,8 +4547,14 @@ function bindTableScroll() {
       boundScrollEl = root
       root.addEventListener('scroll', () => {
         if (root.scrollTop < 80) void loadEarlier()
+        // 表体横滚 → 底部那条跟着走
+        const bar = hbarRef.value
+        if (bar && Math.abs(bar.scrollLeft - root.scrollLeft) > 1) {
+          bar.scrollLeft = root.scrollLeft
+        }
       })
     }
+    refreshHbar()
   })
 }
 
@@ -8262,11 +8313,13 @@ onMounted(async () => {
   bindTableScroll()
   connectEvents()
   document.addEventListener('paste', onGlobalPaste)
+  window.addEventListener('resize', refreshHbar)
 })
 
 onUnmounted(() => {
   disconnectEvents()
   document.removeEventListener('paste', onGlobalPaste)
+  window.removeEventListener('resize', refreshHbar)
 })
 </script>
 
@@ -9475,6 +9528,38 @@ onUnmounted(() => {
 }
 .wb-table :deep(.ant-table-body)::-webkit-scrollbar-thumb:hover,
 .wb-table :deep(.ant-table-content)::-webkit-scrollbar-thumb:hover {
+  background: hsl(35 10% 55%);
+}
+/* 底部常驻横向滚动条：表体自己那条隐藏，避免两条并存 */
+.wb-table :deep(.ant-table-body)::-webkit-scrollbar:horizontal,
+.wb-table :deep(.ant-table-content)::-webkit-scrollbar:horizontal {
+  height: 0 !important;
+  display: none;
+}
+.wb-hbar {
+  height: 16px;
+  margin-top: 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: hsl(38 20% 91%);
+  border-top: 1px solid hsl(35 12% 78%);
+  scrollbar-width: thin;
+}
+.wb-hbar-inner {
+  height: 1px;
+}
+.wb-hbar::-webkit-scrollbar {
+  height: 14px;
+}
+.wb-hbar::-webkit-scrollbar-track {
+  background: hsl(38 20% 91%);
+}
+.wb-hbar::-webkit-scrollbar-thumb {
+  background: hsl(35 10% 66%);
+  border: 3px solid hsl(38 20% 91%);
+  border-radius: 8px;
+}
+.wb-hbar::-webkit-scrollbar-thumb:hover {
   background: hsl(35 10% 55%);
 }
 .wb-row-num {

@@ -101,12 +101,23 @@ def clean_value(value: Any) -> Any:
 
 
 def _normalize_numeric_fields(meta: dict[str, dict[str, Any]], payload: dict[str, Any]) -> None:
-    """数字列空字符串转 NULL，避免 MySQL 1366。"""
+    """数字列空字符串转 NULL，避免 MySQL 1366。
+
+    非数字文本（用户习惯写「4-5」这种区间）以前会原样进 SQL，直接抛
+    `1366 Incorrect decimal value` 变成数据库报错。这里当场拦下来给人话。
+    """
     for col, value in list(payload.items()):
         if meta.get(col, {}).get("type") not in ("number", "decimal"):
             continue
-        if isinstance(value, str) and not value.strip():
-            payload[col] = None
+        if isinstance(value, str):
+            if not value.strip():
+                payload[col] = None
+                continue
+            try:
+                float(value)
+            except ValueError as exc:
+                label = (meta.get(col) or {}).get("label") or col
+                raise HTTPException(status_code=400, detail=f"「{label}」需要填数字，不能是「{value}」") from exc
 
 
 def _normalize_date_fields(meta: dict[str, dict[str, Any]], payload: dict[str, Any]) -> None:
@@ -2964,26 +2975,72 @@ async def get_dashboard(
         rows = (
             await session.execute(text("SELECT * FROM biz_order WHERE is_deleted=0"))
         ).mappings().all()
+        # 操作仪表盘的口径按妙搭来（用户 2026-11-24 反馈「数据绝对有问题」）：
+        #   1. 「本周/本月操作」按 **iFreight 记录** 计票（一条记录一票），操作人取
+        #      iFreight 自己的「国内操作」，日期取关联订单的航班/入仓时间；
+        #   2. 周是**当前这一周**（周一~周日），不是上一周；
+        #   3. 没填国内操作的票不参与统计；
+        #   4. 待操作 = 单票状态 ≠ 已完成（未交接 + 已交接）。
+        ops_week_from = datetime.combine(monday, datetime.min.time())
+        ops_week_to = datetime.combine(monday + timedelta(days=6), datetime.max.time())
+        order_by_id = {int(r["id"]): r for r in rows}
+        ifr_rows = (
+            await session.execute(
+                text("SELECT id, domestic_operation FROM biz_ifreight WHERE is_deleted=0")
+            )
+        ).mappings().all()
+        order_of_ifr = {
+            int(link["to_id"]): int(link["from_id"])
+            for link in (
+                await session.execute(
+                    text(
+                        "SELECT from_id, to_id FROM biz_link WHERE from_table='order' "
+                        "AND to_table='ifreight' AND field='所属订单'"
+                    )
+                )
+            ).mappings().all()
+        }
+
+        def ops_owner(order: Any) -> str:
+            return str(order.get("domestic_operation") or "").strip()
+
         pending_rows = [
-            r for r in rows
-            if r.get("send_forecast") not in (1, True)
+            r
+            for r in rows
+            if r.get("send_forecast") not in (1, True) and ops_owner(r)
         ]
         operators: dict[str, dict[str, Any]] = {}
         for row in pending_rows:
-            name = str(row.get("domestic_operation") or "未分配").strip() or "未分配"
+            name = ops_owner(row)
             item = operators.setdefault(name, {"name": name, "created": 0, "won": 0})
             item["created"] += 1
             if row.get("handover_domestic_operation") in (1, True):
                 item["won"] += 1
-        week_rows = [r for r in rows if isinstance(r.get("flight"), datetime) and week_from <= r["flight"] <= week_to]
-        month_rows = [r for r in rows if isinstance(r.get("flight"), datetime) and r["flight"] >= month_from]
 
-        def by_operator(items: list[Any]) -> list[dict[str, Any]]:
-            mapping: dict[str, int] = {}
-            for row in items:
-                name = str(row.get("domestic_operation") or "未分配").strip() or "未分配"
-                mapping[name] = mapping.get(name, 0) + 1
-            return [{"name": k, "value": v, "caption": f"{v} 票"} for k, v in sorted(mapping.items(), key=lambda x: -x[1])]
+        # 周/月票数：一条 iFreight 记录一票，按 iFreight 的国内操作归人
+        week_by: dict[str, int] = {}
+        month_by: dict[str, int] = {}
+        for ifr in ifr_rows:
+            owner = str(ifr.get("domestic_operation") or "").strip()
+            if not owner:
+                continue
+            order = order_by_id.get(order_of_ifr.get(int(ifr["id"]), 0))
+            if not order:
+                continue
+            flight = order.get("flight")
+            if not isinstance(flight, datetime):
+                continue
+            if ops_week_from <= flight <= ops_week_to:
+                week_by[owner] = week_by.get(owner, 0) + 1
+            if flight >= month_from:
+                month_by[owner] = month_by.get(owner, 0) + 1
+
+        def by_operator(mapping: dict[str, int]) -> list[dict[str, Any]]:
+            return [
+                {"name": k, "value": v, "caption": f"{v} 票"}
+                for k, v in sorted(mapping.items(), key=lambda x: -x[1])
+            ]
+
         pending_chart = []
         for name, item in operators.items():
             pending_chart.append({
@@ -2994,7 +3051,7 @@ async def get_dashboard(
             })
         week_dist = []
         for i in range(7):
-            day = monday - timedelta(days=7) + timedelta(days=i)
+            day = monday + timedelta(days=i)
             count = sum(
                 1 for r in rows
                 if isinstance(r.get("warehouse_in_operation_time"), datetime)
@@ -3026,7 +3083,7 @@ async def get_dashboard(
         operator_table = []
         for name in sorted({str(r.get("domestic_operation") or "未分配").strip() or "未分配" for r in rows}):
             current = [r for r in rows if (str(r.get("domestic_operation") or "未分配").strip() or "未分配") == name]
-            week_count = sum(1 for r in current if isinstance(r.get("warehouse_in_operation_time"), datetime) and week_from <= r["warehouse_in_operation_time"] <= week_to)
+            week_count = sum(1 for r in current if isinstance(r.get("warehouse_in_operation_time"), datetime) and ops_week_from <= r["warehouse_in_operation_time"] <= ops_week_to)
             month_count = sum(1 for r in current if isinstance(r.get("warehouse_in_operation_time"), datetime) and r["warehouse_in_operation_time"] >= month_from)
             done = sum(1 for r in current if r.get("send_forecast") in (1, True))
             operator_table.append({
@@ -3038,14 +3095,14 @@ async def get_dashboard(
             })
         cards = [
             {"label": "待操作", "value": len(pending_rows)},
-            {"label": "本周操作", "value": len(week_rows)},
-            {"label": "本月操作", "value": len(month_rows)},
+            {"label": "本周操作", "value": sum(week_by.values())},
+            {"label": "本月操作", "value": sum(month_by.values())},
             {"label": "已完成", "value": sum(1 for r in rows if r.get("send_forecast") in (1, True))},
         ]
         sections = [
             {"key": "pending", "title": "待操作货物", "caption": "深色已交接，浅色未交接；已完成不进图", "type": "stacked", "data": pending_chart},
-            {"key": "week", "title": "周操作货物", "caption": f"{week_start:%Y-%m-%d} ~ {week_end:%m-%d}，按航班", "type": "bar", "data": by_operator(week_rows)},
-            {"key": "month", "title": "月操作货物", "caption": f"{month_start:%Y-%m}，按航班", "type": "bar", "data": by_operator(month_rows)},
+            {"key": "week", "title": "周操作货物", "caption": f"{ops_week_from:%Y-%m-%d} ~ {ops_week_to:%m-%d}，按航班", "type": "bar", "data": by_operator(week_by)},
+            {"key": "month", "title": "月操作货物", "caption": f"{month_start:%Y-%m}，按航班", "type": "bar", "data": by_operator(month_by)},
             {"key": "weekDist", "title": "本周按入仓时间分布", "caption": "按入仓操作时间", "type": "line", "data": week_dist},
             {"key": "historyWeek", "title": "历史周票数", "caption": "按入仓操作时间", "type": "line", "data": history_week},
             {"key": "historyMonth", "title": "历史月票数", "caption": "按入仓操作时间", "type": "line", "data": history_month},
@@ -3073,7 +3130,7 @@ async def get_dashboard(
         ]
         return {
             "title": "待操作货物仪表盘",
-            "subtitle": f"{week_start:%Y-%m-%d} ~ {week_end:%Y-%m-%d}",
+            "subtitle": f"{ops_week_from:%Y-%m-%d} ~ {ops_week_to:%Y-%m-%d}",
             "cards": cards,
             "sections": sections,
             "operatorTable": operator_table,
