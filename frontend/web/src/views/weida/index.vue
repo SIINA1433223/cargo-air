@@ -3148,8 +3148,9 @@ const antColumns = computed<any[]>(() => {
       }),
     },
   ]
-  // 「查看」列紧挨着常驻状态列（妙搭 detailColumn 置顶），且不依赖账单状态列
-  if (role.value === 'domestic_ops') {
+  // 「查看」列紧挨着常驻状态列（妙搭 detailColumn 置顶），且不依赖账单状态列。
+  // 用户自己配了妙搭的「查看」列（key = detail）时不再补这一列，免得出现两个「查看」。
+  if (role.value === 'domestic_ops' && !displayColumns.value.some((c) => c.key === 'detail')) {
     cols.push({ title: '查看', key: '__view_left', width: 64, fixed: 'left', align: 'center' })
   }
   for (const c of displayColumns.value) {
