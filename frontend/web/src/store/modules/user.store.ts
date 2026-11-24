@@ -245,15 +245,25 @@ export const useUserStore = defineStore(
      */
     async function getSm2PublicKey(): Promise<string | null> {
       if (cachedSm2PublicKey) return cachedSm2PublicKey
-      try {
-        const response = await AuthAPI.getSmPublicKey()
-        const key = response.data.data?.public_key
-        if (key && key.length >= 128) {
-          cachedSm2PublicKey = key
-          return key
+      // 兼容两种返回形态（整包 / 拦截器已解包），并做一次重试：
+      // 网络抖动时拿不到公钥会直接报「无法获取 SM2 公钥」，用户看到的就是登录失败。
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          const response = await AuthAPI.getSmPublicKey()
+          const payload: any = response?.data ?? {}
+          const key: unknown =
+            payload?.data?.public_key ?? payload?.public_key ?? payload?.data ?? null
+          if (typeof key === 'string') {
+            const clean = key.trim()
+            if (clean.length >= 128) {
+              cachedSm2PublicKey = clean
+              return clean
+            }
+          }
+        } catch {
+          // 再试一次
         }
-      } catch {
-        // 获取失败
+        await new Promise((resolve) => setTimeout(resolve, 300))
       }
       return null
     }
