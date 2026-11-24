@@ -303,6 +303,14 @@
               <template v-else-if="column.key === '__view'">
                 <a-button type="link" size="small" @click.stop="openDetail(record)">查看</a-button>
               </template>
+              <!-- 妙搭的「查看」列（可排在任意位置） -->
+              <template v-else-if="column.key === 'detail'">
+                <a-button type="link" size="small" @click.stop="openDetail(record)">查看</a-button>
+              </template>
+              <!-- 妙搭的「录入」按钮列：点开这一票的做账明细 -->
+              <template v-else-if="colOf(column.key)?.kind === 'fee'">
+                <a-button type="link" size="small" @click.stop="openFeeForRow(record)">录入</a-button>
+              </template>
               <template v-else>
                 <div
                   v-if="inlineEdit && inlineEdit.rowId === record.id && inlineEdit.key === column.key"
@@ -403,10 +411,10 @@
                 <a-input
                   v-else
                   size="small"
-                  :value="blankValues[`${record.id}:${column.key}`] || ''"
+                  :value="blankValues[`${recordKey(record)}:${column.key}`] || ''"
                   placeholder="本机备注"
                   @click.stop
-                  @update:value="(v: string) => (blankValues[`${record.id}:${column.key}`] = v)" />
+                  @update:value="(v: string) => (blankValues[`${recordKey(record)}:${column.key}`] = v)" />
               </template>
               </div>
             </template>
@@ -2640,6 +2648,10 @@ import { Auth } from '@/utils/auth'
 import WeidaFieldEditor from './components/FieldEditor.vue'
 import MasterDataPanel from './components/MasterDataPanel.vue'
 import ECharts from '@/components/ECharts/index.vue'
+// 两位国内操作的个性化视图（用户 2026-11-24 给的妙搭配置）：新机器/新浏览器第一次
+// 进入操作台时自动铺一次，之后以本机改动为准（见 maybeSeedViewConfig）。
+import landisViewConfig from './configs/landis.json'
+import lilyViewConfig from './configs/lily.json'
 
 defineOptions({ name: 'WeidaWorkbench' })
 
@@ -2657,9 +2669,16 @@ type DisplayCol =
   | { key: string; label: string; kind: 'field'; column: string; type: string; virtual?: boolean; options?: string[] }
   | { key: string; label: string; kind: 'template'; expression: string }
   | { key: string; label: string; kind: 'blank' }
+  // 妙搭的两种「按钮列」：detail = 查看（打开抽屉），fee = 录入（去这一票的做账明细）
+  | { key: string; label: string; kind: 'detail' }
+  | { key: string; label: string; kind: 'fee' }
+/** 单元格文字样式（妙搭 cellTextStyles 的形状，逐属性生效）。 */
+type TextStyle = { color?: string; bold?: boolean; italic?: boolean; size?: number }
 type FieldValue = { label: string; value: any; step?: number | null }
 type Row = {
   id: number
+  /** 飞书记录 id（reczz…）：本机视图配置（行高/字色/本地列值）按它存 */
+  feishu_record_id?: string | null
   is_new?: boolean
   fleet?: { count?: string; weight?: string; size?: string; volume?: number | null; ratio?: string | null; arrived?: boolean }
   fields: Record<string, FieldValue>
@@ -2810,6 +2829,16 @@ const blankLabel = ref('')
 const editingTemplateKey = ref('')
 const columnWidths = ref<Record<string, number>>({})
 const rowHeight = ref(54)
+// 妙搭个性化视图里的三种文字样式与逐行行高（键用飞书 record_id，列用列 key）
+const rowHeights = ref<Record<string, number>>({})
+const cellTextStyles = ref<Record<string, TextStyle>>({})
+const rowTextStyles = ref<Record<string, TextStyle>>({})
+const columnTextStyles = ref<Record<string, TextStyle>>({})
+
+/** 一行的稳定键：优先飞书 record_id（妙搭配置按它存），老的没有就退回本地 id。 */
+function recordKey(row: Row): string {
+  return String(row.feishu_record_id || row.id)
+}
 const ZOOM_OPTIONS = [70, 80, 90, 100, 110, 120, 130, 150]
 const tableZoom = ref(100)
 
@@ -2960,6 +2989,8 @@ const displayColumns = computed<DisplayCol[]>(() =>
         const blank = blankColumns.value.find((b) => b.id === key)
         return blank ? { key, label: blank.label, kind: 'blank' } : null
       }
+      if (key === 'detail') return { key, label: '查看', kind: 'detail' }
+      if (key.startsWith('fee:')) return { key, label: key.slice(4), kind: 'fee' }
       const c = columnMap.value.get(key)
       return c
         ? {
@@ -3131,7 +3162,7 @@ const antColumns = computed<any[]>(() => {
       fixed: frozenColumns.value.includes(c.key) ? 'left' : undefined,
       ellipsis: false,
       customCell: (record: Row) => ({
-        style: paintCellStyle({ row: record, column: { property: prop } }),
+        style: cellStyleOf(record, c.key),
         onClick: () => onCellClick(record, { property: prop }),
         // 双击也进编辑（日期这类字段用户习惯双击）
         onDblclick: () => onCellClick(record, { property: prop }),
@@ -3160,8 +3191,9 @@ const antColumns = computed<any[]>(() => {
 })
 
 function antCustomRow(record: Row) {
+  const h = rowHeights.value[recordKey(record)]
   return {
-    style: rowTintStyle({ row: record }),
+    style: { ...rowTintStyle({ row: record }), ...(h ? { height: `${h}px` } : {}) },
     // 未读加粗只有国内操作台配了（妙搭 rowHints.unreadBold），别的台子不加
     class: role.value === 'domestic_ops' && isUnread(record) ? 'wb-row-unread' : '',
   }
@@ -4152,8 +4184,36 @@ async function loadConfig() {
     // ignore
   }
   if (config.value?.no_paging) pageSize.value = 100
+  maybeSeedViewConfig()
   restoreViewConfig()
   restoreFilterViews()
+}
+
+/**
+ * 国内操作两位同事的妙搭视图一次性铺进本机（用户 2026-11-24）。
+ *
+ * 只在「这个人的这版种子还没铺过」时执行，铺完打标记；之后用户怎么调都归他自己。
+ * 认的是 `current_staff.name`（后端按登录人给的），不是账号 id —— 换机器也能对上。
+ */
+const MIAODA_SEEDS: Record<string, any> = {
+  'Landis Liu': landisViewConfig,
+  'Lily Sun': lilyViewConfig,
+}
+const SEED_VERSION = 'v1'
+
+function maybeSeedViewConfig() {
+  if (role.value !== 'domestic_ops') return
+  const name = config.value?.current_staff?.name || ''
+  const seed = MIAODA_SEEDS[name]
+  if (!seed) return
+  const markerKey = `weida_seed_${SEED_VERSION}:${role.value}:${name}`
+  try {
+    if (localStorage.getItem(markerKey) === '1') return
+    applyMiaodaViewConfig(seed)
+    localStorage.setItem(markerKey, '1')
+  } catch {
+    // 种子配置出问题不该挡住工作台打开
+  }
 }
 
 function restoreViewConfig() {
@@ -4164,6 +4224,10 @@ function restoreViewConfig() {
   let blanks: BlankColumn[] = []
   let widths: Record<string, number> = {}
   let blanksValues: Record<string, string> = {}
+  let heights: Record<string, number> = {}
+  let cellStyles: Record<string, TextStyle> = {}
+  let rowStyles: Record<string, TextStyle> = {}
+  let colStyles: Record<string, TextStyle> = {}
   const saved = localStorage.getItem(`weida_columns_v11:${role.value}`)
   if (saved) {
     try {
@@ -4174,10 +4238,18 @@ function restoreViewConfig() {
       if (Array.isArray(parsed.blanks)) blanks = parsed.blanks
       if (parsed.blankValues && typeof parsed.blankValues === 'object') blanksValues = parsed.blankValues
       if (parsed.widths && typeof parsed.widths === 'object') widths = parsed.widths
+      if (parsed.rowHeights && typeof parsed.rowHeights === 'object') heights = parsed.rowHeights
+      if (parsed.cellTextStyles && typeof parsed.cellTextStyles === 'object') cellStyles = parsed.cellTextStyles
+      if (parsed.rowTextStyles && typeof parsed.rowTextStyles === 'object') rowStyles = parsed.rowTextStyles
+      if (parsed.columnTextStyles && typeof parsed.columnTextStyles === 'object') colStyles = parsed.columnTextStyles
     } catch {
       // 旧配置坏了就回默认
     }
   }
+  rowHeights.value = heights
+  cellTextStyles.value = cellStyles
+  rowTextStyles.value = rowStyles
+  columnTextStyles.value = colStyles
   try {
     const rawValues = localStorage.getItem(`weida_blank_values:${role.value}`)
     if (rawValues) blanksValues = { ...blanksValues, ...JSON.parse(rawValues) }
@@ -4210,6 +4282,7 @@ function restoreViewConfig() {
   columnOrder.value = order.filter((name: string) => {
     if (name.startsWith('tpl:')) return templates.some((t) => t.id === name)
     if (name.startsWith('blank:')) return blanks.some((b) => b.id === name)
+    if (name === 'detail' || name.startsWith('fee:')) return true
     return columnMap.value.has(name)
   })
   if (!columnOrder.value.length) columnOrder.value = defaults
@@ -4757,7 +4830,7 @@ function ruleValue(row: Row, key: string): any {
   if (!c) return ''
   if (c.kind === 'field') return cellValue(row, c.column)
   if (c.kind === 'template') return renderTemplate(c.expression, row)
-  return blankValues.value[`${row.id}:${c.key}`] || ''
+  return blankValues.value[`${recordKey(row)}:${c.key}`] || ''
 }
 
 function rowTintStyle({ row }: { row: Row }) {
@@ -4927,6 +5000,33 @@ function paintCellStyle({ row, column }: { row: Row; column: any }) {
   return base
 }
 
+/**
+ * 文字样式（妙搭 cellTextStyles / rowTextStyles / columnTextStyles）。
+ * 优先级按妙搭：单元格 > 整列 > 整行，逐属性覆盖。
+ */
+function textStyleOf(row: Row, key: string): Record<string, any> {
+  const rid = recordKey(row)
+  const merged: TextStyle = {}
+  for (const s of [rowTextStyles.value[rid], columnTextStyles.value[key], cellTextStyles.value[`${rid}:${key}`]]) {
+    if (!s) continue
+    if (s.color !== undefined) merged.color = s.color
+    if (s.bold !== undefined) merged.bold = s.bold
+    if (s.italic !== undefined) merged.italic = s.italic
+    if (s.size !== undefined) merged.size = s.size
+  }
+  const out: Record<string, any> = {}
+  if (merged.color) out.color = merged.color
+  if (merged.bold) out.fontWeight = 600
+  if (merged.italic) out.fontStyle = 'italic'
+  if (merged.size) out.fontSize = `${merged.size}px`
+  return out
+}
+
+/** 单元格最终样式：条件填色 + 文字样式（后者覆盖同名字体项）。 */
+function cellStyleOf(row: Row, key: string): Record<string, any> {
+  return { ...paintCellStyle({ row, column: { property: key } }), ...textStyleOf(row, key) }
+}
+
 const INLINE_READONLY = new Set([
   'single_status',
   'goods_data',
@@ -4959,7 +5059,7 @@ function onCellClick(row: Row, column: any) {
   if (inlineEdit.value && inlineEdit.value.rowId === row.id && inlineEdit.value.key === key) return
   if (inlineEdit.value) void saveInlineEdit()
   const c = displayColumns.value.find((x) => x.key === key)
-  if (!c || c.kind === 'blank') return
+  if (!c || c.kind === 'blank' || c.kind === 'detail' || c.kind === 'fee') return
   if (c.kind === 'field' && c.column === 'goods_data' && role.value === 'domestic_ops') {
     void openGoodsEditor(row)
     return
@@ -5121,6 +5221,20 @@ watch(
   { deep: true }
 )
 
+/** 妙搭的筛选/填色操作符 → 本系统的操作符。 */
+function mapMiaodaOp(op: string): string {
+  if (op === 'equals') return 'eq'
+  if (op === 'not_equals') return 'ne'
+  if (op === 'not_empty') return 'is_not_empty'
+  if (op === 'empty') return 'is_empty'
+  return String(op || 'contains')
+}
+
+/**
+ * 导入妙搭的个性化视图配置（用户从妙搭导出的 `weida_view_config` 整份 localStorage，
+ * 或其中当前工作台那一份）。列、列宽、冻结、拼接列、本地列、本地列值、行高、
+ * 条件填色、三种文字样式与命名视图全都还原；认不出的列会汇总提示，不静默丢。
+ */
 async function importMiaodaConfig(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (!file) return
@@ -5137,7 +5251,13 @@ async function importMiaodaConfig(event: Event) {
       }
       return [key, parsedValue] as [string, any]
     })
-    let mine = entries.find(([key]) => key.endsWith(`:${role.value}`))?.[1] || parsed
+    // 优先当前工作台那份视图配置；整份导出里找不到时退回任何 domestic_ops 的视图配置。
+    // 只看 `weida_view_config:*` —— 同一份 localStorage 里还有 `weida_seen:*` 之类
+    // 同样以 `:domestic_ops` 结尾的键，先命中它们会解析失败。
+    let mine =
+      entries.find(([key]) => key.startsWith('weida_view_config') && key.endsWith(`:${role.value}`))?.[1] ||
+      entries.find(([key]) => key.startsWith('weida_view_config') && key.endsWith(':domestic_ops'))?.[1] ||
+      parsed
     if (typeof mine === 'string') {
       try {
         mine = JSON.parse(mine)
@@ -5149,29 +5269,13 @@ async function importMiaodaConfig(event: Event) {
       ElMessage.warning('这个文件里没有找到当前工作台的配置')
       return
     }
-    const labelToColumn = new Map<string, string>()
-    for (const c of config.value?.columns || []) labelToColumn.set(c.label, c.column)
-    for (const c of config.value?.detail_fields || []) labelToColumn.set(c.label, c.column)
-    const order: string[] = []
-    for (const c of mine.columns) {
-      const column = labelToColumn.get(String(c.name || c.label || '').trim())
-      if (column && !order.includes(column)) order.push(column)
+    const applied = applyMiaodaViewConfig(mine)
+    if (applied) {
+      const tail = applied.skipped.length
+        ? `；${applied.skipped.length} 个本系统没有的字段已跳过（${applied.skipped.slice(0, 5).join('、')}）`
+        : ''
+      ElMessage.success(`已导入 ${applied.columns} 列、${applied.views} 个视图、${applied.rules} 条填色${tail}`)
     }
-    if (!order.length) {
-      ElMessage.warning('没有匹配到当前工作台的列')
-      return
-    }
-    const widthSource = mine.columnWidths || {}
-    const widths: Record<string, number> = {}
-    for (const [name, width] of Object.entries(widthSource)) {
-      const column = labelToColumn.get(String(name).trim())
-      if (column && Number(width) > 0) widths[column] = Number(width)
-    }
-    columnOrder.value = order
-    columnWidths.value = widths
-    frozenColumns.value = []
-    saveColumns()
-    ElMessage.success(`已导入 ${order.length} 列及列宽`)
   } catch (e: any) {
     ElMessage.error(e?.message || '配置文件解析失败')
   } finally {
@@ -5179,30 +5283,236 @@ async function importMiaodaConfig(event: Event) {
   }
 }
 
+/** 把一份妙搭视图配置落到当前工作台；认不出任何列时返回 null。 */
+function applyMiaodaViewConfig(mine: any): { columns: number; views: number; rules: number; skipped: string[] } | null {
+    const labelToColumn = new Map<string, string>()
+    for (const c of config.value?.columns || []) {
+      labelToColumn.set(c.label, c.column)
+      labelToColumn.set(c.column, c.column)
+    }
+    for (const c of config.value?.detail_fields || []) {
+      labelToColumn.set(c.label, c.column)
+      labelToColumn.set(c.column, c.column)
+    }
+
+    const templates: TemplateColumn[] = []
+    const blanks: BlankColumn[] = []
+    /** 妙搭列标识（列名 / tpl:x / blank:x / fee:x / detail）→ 本系统的列 key。 */
+    const idMap = new Map<string, string>()
+    const order: string[] = []
+    const skipped: string[] = []
+
+    const resolve = (raw: string, kind: string): string | null => {
+      const name = String(raw || '').trim()
+      if (!name) return null
+      if (kind === 'template') return `tpl:${name}`
+      if (kind === 'blank') return `blank:${name}`
+      if (kind === 'fee') return `fee:${name}`
+      if (kind === 'detail') return 'detail'
+      return labelToColumn.get(name) || null
+    }
+
+    for (const c of mine.columns) {
+      const kind = String(c?.kind || 'field')
+      const raw = String(c?.name || c?.label || '').trim()
+      const key = resolve(raw, kind)
+      if (!key) {
+        skipped.push(raw)
+        continue
+      }
+      if (kind === 'template') {
+        const label = String(c.label || raw).trim()
+        const id = `tpl:${label}`
+        templates.push({ id, label, expression: String(c.expression || '') })
+        idMap.set(`tpl:${raw}`, id)
+        idMap.set(`tpl:${label}`, id)
+      } else if (kind === 'blank') {
+        const label = String(c.label || raw).trim()
+        const id = `blank:${label}`
+        blanks.push({ id, label })
+        idMap.set(`blank:${label}`, id)
+      } else if (kind === 'fee') {
+        idMap.set(`fee:${raw}`, key)
+      } else {
+        idMap.set(raw, key)
+      }
+      if (!order.includes(key)) order.push(key)
+    }
+    if (!order.length) {
+      ElMessage.warning('没有匹配到当前工作台的列')
+      return null
+    }
+
+    /** 把妙搭的列标识翻成本系统的 key（真字段名也行）。 */
+    const mapId = (raw: string): string | null => {
+      const name = String(raw || '').trim()
+      if (!name) return null
+      if (name === 'detail') return 'detail'
+      if (idMap.has(name)) return idMap.get(name) || null
+      // 本地列/拼接列/按钮列的标识自带前缀：只认这份配置里真有的那几个，
+      // 陈旧的（列已经删了）一律丢掉，免得往存储里塞一堆对不上的键。
+      if (name.startsWith('tpl:') || name.startsWith('blank:') || name.startsWith('fee:')) return null
+      const column = labelToColumn.get(name)
+      return column || null
+    }
+
+    const widths: Record<string, number> = {}
+    for (const [name, width] of Object.entries(mine.columnWidths || {})) {
+      const key = mapId(name)
+      if (key && Number(width) > 0) widths[key] = Number(width)
+    }
+
+    const frozen: string[] = []
+    for (const raw of Array.isArray(mine.frozenColumnIds) ? mine.frozenColumnIds : []) {
+      const key = mapId(raw)
+      if (key && order.includes(key) && !frozen.includes(key)) frozen.push(key)
+    }
+
+    const rules: PaintRule[] = []
+    for (const r of Array.isArray(mine.conditionalRules) ? mine.conditionalRules : []) {
+      const key = mapId(r?.field)
+      if (!key || !r?.color) continue
+      rules.push({
+        id: `${Date.now()}-${Math.random()}`,
+        scope: r.scope === 'row' ? 'row' : r.scope === 'column' ? 'column' : 'cell',
+        column: key,
+        op: mapMiaodaOp(r.operator),
+        value: r.value ?? '',
+        color: String(r.color),
+      })
+    }
+
+    /** 逐条文字样式：键形如 `${recordId}:${colId}`，列名翻成 key。 */
+    const mapStyleKeys = (source: any): Record<string, TextStyle> => {
+      const out: Record<string, TextStyle> = {}
+      if (!source || typeof source !== 'object') return out
+      for (const [compound, style] of Object.entries(source as Record<string, any>)) {
+        // 首个冒号分界：列标识自己可能带冒号（`blank:备注` / `tpl:时间`），不能从后往前切
+        const idx = compound.indexOf(':')
+        if (idx < 0 || !style || typeof style !== 'object') continue
+        const recId = compound.slice(0, idx)
+        const key = mapId(compound.slice(idx + 1))
+        if (!key) continue
+        const next: TextStyle = {}
+        if (typeof style.color === 'string' && style.color) next.color = style.color
+        if (style.bold === true) next.bold = true
+        if (style.italic === true) next.italic = true
+        if (typeof style.size === 'number') next.size = style.size
+        if (Object.keys(next).length) out[`${recId}:${key}`] = next
+      }
+      return out
+    }
+    const mapStyleRowKeys = (source: any): Record<string, TextStyle> => {
+      const out: Record<string, TextStyle> = {}
+      if (!source || typeof source !== 'object') return out
+      for (const [recId, style] of Object.entries(source as Record<string, any>)) {
+        if (!style || typeof style !== 'object') continue
+        const next: TextStyle = {}
+        if (typeof style.color === 'string' && style.color) next.color = style.color
+        if (style.bold === true) next.bold = true
+        if (style.italic === true) next.italic = true
+        if (typeof style.size === 'number') next.size = style.size
+        if (Object.keys(next).length) out[recId] = next
+      }
+      return out
+    }
+    const mapStyleColumnKeys = (source: any): Record<string, TextStyle> => {
+      const out: Record<string, TextStyle> = {}
+      if (!source || typeof source !== 'object') return out
+      for (const [raw, style] of Object.entries(source as Record<string, any>)) {
+        const key = mapId(raw)
+        if (!key || !style || typeof style !== 'object') continue
+        const next: TextStyle = {}
+        if (typeof style.color === 'string' && style.color) next.color = style.color
+        if (style.bold === true) next.bold = true
+        if (style.italic === true) next.italic = true
+        if (typeof style.size === 'number') next.size = style.size
+        if (Object.keys(next).length) out[key] = next
+      }
+      return out
+    }
+
+    const blanksValues: Record<string, string> = {}
+    for (const [compound, value] of Object.entries(
+      (mine.blankValues && typeof mine.blankValues === 'object' ? mine.blankValues : {}) as Record<string, any>
+    )) {
+      const idx = compound.indexOf(':')
+      if (idx < 0) continue
+      const key = mapId(compound.slice(idx + 1))
+      if (!key || typeof value !== 'string') continue
+      blanksValues[`${compound.slice(0, idx)}:${key}`] = value
+    }
+
+    const heights: Record<string, number> = {}
+    for (const [recId, h] of Object.entries(
+      (mine.rowHeights && typeof mine.rowHeights === 'object' ? mine.rowHeights : {}) as Record<string, any>
+    )) {
+      if (Number(h) > 0) heights[recId] = Number(h)
+    }
+
+    const views: FilterView[] = []
+    for (const v of Array.isArray(mine.views) ? mine.views : []) {
+      if (!v || !Array.isArray(v.conditions)) continue
+      const conditions: FilterCondition[] = []
+      for (const cond of v.conditions) {
+        const key = mapId(cond?.field)
+        if (!key) continue
+        conditions.push({
+          column: key,
+          op: mapMiaodaOp(cond.operator),
+          value: cond.value ?? '',
+          value2: cond.value2,
+        })
+      }
+      if (!conditions.length) continue
+      views.push({
+        id: String(v.id || `v-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`),
+        name: String(v.name || '视图'),
+        conjunction: v.conjunction === 'or' ? 'or' : 'and',
+        conditions,
+      })
+    }
+
+    // 一次性写进本系统的状态与本机存储（列、冻结、拼接、本地列、列宽、行高、样式、填色、视图）
+    columnOrder.value = order
+    templateColumns.value = templates
+    blankColumns.value = blanks
+    columnWidths.value = widths
+    frozenColumns.value = frozen
+    paintRules.value = rules
+    localStorage.setItem(`weida_paint_rules:${role.value}`, JSON.stringify(rules))
+    syncPref('paint', rules)
+    cellTextStyles.value = mapStyleKeys(mine.cellTextStyles)
+    rowTextStyles.value = mapStyleRowKeys(mine.rowTextStyles)
+    columnTextStyles.value = mapStyleColumnKeys(mine.columnTextStyles)
+    blankValues.value = blanksValues
+    rowHeights.value = heights
+    savedViews.value = views
+    localStorage.setItem(`weida_filter_views:${role.value}`, JSON.stringify(views))
+    activeViewId.value = ''
+    saveColumns()
+    return { columns: order.length, views: views.length, rules: rules.length, skipped }
+}
+
 function saveColumns() {
   if (!columnOrder.value.length) {
     ElMessage.warning('至少保留一列')
     return
   }
-  localStorage.setItem(
-    `weida_columns_v11:${role.value}`,
-    JSON.stringify({
-      order: columnOrder.value,
-      frozen: frozenColumns.value,
-      templates: templateColumns.value,
-      blanks: blankColumns.value,
-      blankValues: blankValues.value,
-      widths: columnWidths.value,
-    })
-  )
-  syncPref('columns_v6', {
+  const payload = {
     order: columnOrder.value,
     frozen: frozenColumns.value,
     templates: templateColumns.value,
     blanks: blankColumns.value,
     blankValues: blankValues.value,
     widths: columnWidths.value,
-  })
+    rowHeights: rowHeights.value,
+    cellTextStyles: cellTextStyles.value,
+    rowTextStyles: rowTextStyles.value,
+    columnTextStyles: columnTextStyles.value,
+  }
+  localStorage.setItem(`weida_columns_v11:${role.value}`, JSON.stringify(payload))
+  syncPref('columns_v6', payload)
   columnOpen.value = false
 }
 
@@ -5213,6 +5523,10 @@ function resetColumns() {
   blankColumns.value = []
   blankValues.value = {}
   columnWidths.value = {}
+  rowHeights.value = {}
+  cellTextStyles.value = {}
+  rowTextStyles.value = {}
+  columnTextStyles.value = {}
   tplLabel.value = ''
   tplExpr.value = ''
   editingTemplateKey.value = ''
@@ -5265,6 +5579,12 @@ function openCreate() {
   activeTab.value = '商机详情'
   detailSnapshot.value = JSON.stringify(editModel)
   drawerOpen.value = true
+}
+
+/** 「录入」列：打开这一票的详情并落到「做账明细」页（妙搭 fee 列的行为）。 */
+async function openFeeForRow(row: Row) {
+  await openDetail(row)
+  activeTab.value = '做账明细'
 }
 
 async function openDetail(row: Row) {

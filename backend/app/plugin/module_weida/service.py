@@ -687,7 +687,9 @@ def _row_to_item(row: Any, labels: dict[str, str]) -> dict[str, Any]:
         if col in ("id", "is_deleted", "create_by", "update_by", "feishu_record_id"):
             continue
         fields[col] = {"label": labels.get(col, col), "value": normalize(value)}
-    return {"id": row["id"], "fields": fields}
+    # feishu_record_id 随行走：本机视图配置（行高/字色/本地列值）按妙搭的
+    # `record_id` 存，前端要靠它把那些键对回这一行（缺失时前端退回本地 id）。
+    return {"id": row["id"], "feishu_record_id": row.get("feishu_record_id"), "fields": fields}
 
 
 PERSON_FIELDS = {
@@ -4756,6 +4758,29 @@ async def set_bill_status(order_id: int, step: int | None) -> dict[str, Any]:
     return {"step": step, "label": BILL_STEPS[step] if step else ""}
 
 
+OPERATOR_MAIL_FALLBACK = "weida-tao@foxmail.com"
+
+
+async def _operator_email(order: Any) -> str:
+    """操作邮箱：按订单「国内操作」的人名去飞书人员代码表查电子邮箱。
+
+    用户 2026-11-24：提货邮件之前一律发 weida-tao，实际该发这票的操作人。
+    人名对不上（或表里没填邮箱）才退回操作邮箱兜底地址。
+    """
+    name = str(order.get("domestic_operation") or "").strip()
+    if name:
+        try:
+            from .action_mails import _people_emails
+
+            emails = await run_in_threadpool(_people_emails)
+            mail = emails.get(name)
+            if mail and "@" in mail:
+                return mail
+        except Exception:
+            pass
+    return OPERATOR_MAIL_FALLBACK
+
+
 ACTION_MAIL_SUBJECTS = {
     "pickup": "头程提货通知",
     "forecast": "国外预报",
@@ -4897,9 +4922,11 @@ async def send_action_mail(order_id: int, kind: str) -> dict[str, Any]:
         path = UPLOAD_DIR / item["storage_key"]
         if path.exists():
             files.append((item["file_name"], path.read_bytes(), "application/octet-stream"))
+    # 提货邮件发给这票的国内操作；其余两类沿用原兜底地址
+    to = await _operator_email(order) if kind == "pickup" else OPERATOR_MAIL_FALLBACK
     await run_in_threadpool(
         send_mail,
-        "weida-tao@foxmail.com",
+        to,
         f"{ACTION_MAIL_SUBJECTS[kind]}-{order.get('master_no') or order.get('order_no') or order_id}",
         "\n".join(lines),
         profile="default",
@@ -4931,7 +4958,7 @@ async def send_action_mail(order_id: int, kind: str) -> dict[str, Any]:
             await xanda_sync_order(order_id)
         except Exception:
             pass
-    return {"kind": kind, "to": "weida-tao@foxmail.com", "attachments": len(files)}
+    return {"kind": kind, "to": to, "attachments": len(files)}
 
 
 def _text_date(value: Any) -> str:
@@ -6161,7 +6188,7 @@ async def send_second_leg_mail(order_id: int) -> dict[str, Any]:
                 files.append((str(item["file_name"]), path.read_bytes(), "application/octet-stream"))
         await run_in_threadpool(
             send_mail,
-            "weida-tao@foxmail.com",
+            await _operator_email(order),
             subject,
             "\n".join(line for line in lines if line.split("：", 1)[-1].strip()),
             profile="default",
