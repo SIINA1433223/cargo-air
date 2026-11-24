@@ -50,16 +50,40 @@
             新建商机
           </a-button>
           <a-button class="wb-t-columns" size="small" @click="columnOpen = true">自定义列</a-button>
-          <a-button class="wb-t-paint" size="small" @click="paintOpen = true">填色</a-button>
-          <!-- 比例调整：只缩放索引页表格（弹窗、抽屉不受影响），按账号记本机 -->
-          <el-select
+          <!-- 上色：Excel 式「勾选行 → 点颜色」，不再用飞书那套条件格式（用户 2026-11-24） -->
+          <el-popover placement="bottom" :width="252" trigger="click">
+            <template #reference>
+              <a-button class="wb-t-paint" size="small">上色</a-button>
+            </template>
+            <div class="wb-fill-panel">
+              <p class="wb-fill-tip">先勾选左边的行，再点颜色；整行上色，只影响你自己的界面。</p>
+              <div class="wb-fill-grid">
+                <button
+                  v-for="c in FILL_PRESETS"
+                  :key="c"
+                  type="button"
+                  class="wb-fill-dot"
+                  :style="{ backgroundColor: c }"
+                  :title="c"
+                  @click="applyFill(c)" />
+              </div>
+              <el-button size="small" style="margin-top: 10px; width: 100%" @click="applyFill('')">
+                清除选中行的颜色
+              </el-button>
+            </div>
+          </el-popover>
+          <!-- 比例调整：只缩放索引页表格（弹窗、抽屉不受影响），按账号记本机。
+               可以无限往小调（用户 2026-11-24），下限只挡住 0。 -->
+          <el-input-number
             class="wb-t-zoom"
             v-model="tableZoom"
             size="small"
-            style="width: 100px"
-            @change="saveTableZoom">
-            <el-option v-for="z in ZOOM_OPTIONS" :key="z" :label="`比例 ${z}%`" :value="z" />
-          </el-select>
+            :min="1"
+            :max="300"
+            :step="5"
+            controls-position="right"
+            style="width: 110px"
+            @change="saveTableZoom" />
           <a-dropdown class="wb-t-more" trigger="click">
             <a-button size="small">更多</a-button>
             <template #overlay>
@@ -68,7 +92,6 @@
                 <a-menu-divider />
                 <a-menu-item key="create">新建</a-menu-item>
                 <a-menu-item key="columns">自定义列</a-menu-item>
-                <a-menu-item key="paint">填色（{{ paintRules.length }}）</a-menu-item>
                 <a-menu-item key="password">修改密码</a-menu-item>
                 <a-menu-item key="logout">退出登录</a-menu-item>
                 <a-menu-item key="refresh" :disabled="loading">刷新</a-menu-item>
@@ -240,6 +263,7 @@
             :loading="loading"
             :pagination="false"
             :row-key="(record: Row) => record.id"
+            :row-selection="rowSelection"
             :custom-row="antCustomRow"
             :scroll="{ x: 'max-content', y: tableScrollY }"
             size="small"
@@ -2840,21 +2864,22 @@ const columnTextStyles = ref<Record<string, TextStyle>>({})
 function recordKey(row: Row): string {
   return String(row.feishu_record_id || row.id)
 }
-const ZOOM_OPTIONS = [70, 80, 90, 100, 110, 120, 130, 150]
 const tableZoom = ref(100)
 
 // 缩放后表格内部可用高度要换算回「未缩放」的 px，否则缩小只留白、不多显示行
 const tableScrollY = computed(
-  () => `calc((100vh - 168px) * ${(100 / tableZoom.value).toFixed(4)})`,
+  () => `calc((100vh - 168px) * ${(100 / Math.max(1, tableZoom.value || 100)).toFixed(4)})`,
 )
 
 function saveTableZoom() {
+  const zoom = Number(tableZoom.value)
+  tableZoom.value = Number.isFinite(zoom) && zoom > 0 ? zoom : 100
   localStorage.setItem(`weida_zoom:${role.value}`, String(tableZoom.value))
 }
 
 function restoreTableZoom() {
   const saved = Number(localStorage.getItem(`weida_zoom:${role.value}`) || 100)
-  tableZoom.value = ZOOM_OPTIONS.includes(saved) ? saved : 100
+  tableZoom.value = Number.isFinite(saved) && saved > 0 ? saved : 100
 }
 const addColumn = ref('')
 const bindOpen = ref(false)
@@ -2938,6 +2963,46 @@ const inlineCalcVolume = ref<number | null>(null)
 const inlineEdit = ref<InlineEdit | null>(null)
 const inlineEditValue = ref('')
 const inlineSaving = ref(false)
+/**
+ * Excel 式手动上色（用户 2026-11-24 要的）：勾行 → 点颜色，整行铺底色。
+ * 存在本机 `weida_row_fills:<role>`，键是行的稳定键（飞书 record_id）。
+ */
+const FILL_PRESETS = ['#fff3bf', '#ffe3e3', '#d3f9d8', '#d0ebff', '#e5dbff', '#ffe8cc', '#f1f3f5']
+const manualFills = ref<Record<string, string>>({})
+const selectedRowKeys = ref<any[]>([])
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  columnWidth: 36,
+  onChange: (keys: any[]) => {
+    selectedRowKeys.value = keys
+  },
+}))
+function restoreManualFills() {
+  try {
+    const raw = localStorage.getItem(`weida_row_fills:${role.value}`)
+    manualFills.value = raw ? JSON.parse(raw) : {}
+  } catch {
+    manualFills.value = {}
+  }
+}
+function applyFill(color: string) {
+  if (!selectedRowKeys.value.length) {
+    ElMessage.info('先勾选要上色的行')
+    return
+  }
+  const next = { ...manualFills.value }
+  for (const key of selectedRowKeys.value) {
+    const row = rows.value.find((r) => r.id === key)
+    if (!row) continue
+    const rk = recordKey(row)
+    if (color) next[rk] = color
+    else delete next[rk]
+  }
+  manualFills.value = next
+  localStorage.setItem(`weida_row_fills:${role.value}`, JSON.stringify(next))
+  ElMessage.success(color ? '已上色' : '已清除颜色')
+}
+
 const PAINT_PRESETS = [
   '#fde68a',
   '#bbf7d0',
@@ -4189,6 +4254,7 @@ async function loadConfig() {
   maybeSeedViewConfig()
   restoreViewConfig()
   restoreFilterViews()
+  restoreManualFills()
 }
 
 /**
@@ -4486,21 +4552,49 @@ const resizingColumn = ref('')
 let resizeStartX = 0
 let resizeStartWidth = 0
 
+/**
+ * 拖列宽时不再每次 mousemove 都改响应式状态 —— 那会让整张表（几百行）跟着重渲染，
+ * 拖起来一顿一顿。改为直接把宽度写进各段 <colgroup> 的 <col> 上（浏览器原生重排，
+ * 很轻），松手时才提交一次状态并落盘。用户 2026-11-24 反馈「拖动列宽卡顿」。
+ */
+function applyResizeToDom(colIndex: number, width: number) {
+  const root = tableRef.value as HTMLElement | null
+  if (!root) return
+  const groups = root.querySelectorAll('colgroup')
+  groups.forEach((g) => {
+    const col = g.children[colIndex] as HTMLElement | undefined
+    if (col) col.style.width = `${width}px`
+  })
+}
+
 function startColumnResize(event: MouseEvent, key: string) {
   event.preventDefault()
   event.stopPropagation()
   resizingColumn.value = key
   resizeStartX = event.clientX
   resizeStartWidth = columnWidths.value[key] || 160
+  // a-table 自己会在最前面插一列勾选框，colgroup 的下标要跟着偏一位
+  const found = antColumns.value.findIndex((c: any) => c.key === key)
+  const colIndex = found < 0 ? -1 : found + 1
+  let pending = resizeStartWidth
+  let frame = 0
   const move = (e: MouseEvent) => {
     if (!resizingColumn.value) return
-    const next = Math.max(60, Math.min(600, resizeStartWidth + e.clientX - resizeStartX))
-    columnWidths.value = { ...columnWidths.value, [resizingColumn.value]: next }
+    pending = Math.max(60, Math.min(600, resizeStartWidth + e.clientX - resizeStartX))
+    if (frame) return
+    frame = requestAnimationFrame(() => {
+      frame = 0
+      if (colIndex >= 0) applyResizeToDom(colIndex, pending)
+    })
   }
   const up = () => {
     window.removeEventListener('mousemove', move)
     window.removeEventListener('mouseup', up)
-    if (resizingColumn.value) saveColumns()
+    if (frame) cancelAnimationFrame(frame)
+    if (resizingColumn.value) {
+      columnWidths.value = { ...columnWidths.value, [resizingColumn.value]: pending }
+      saveColumns()
+    }
     resizingColumn.value = ''
   }
   window.addEventListener('mousemove', move)
@@ -4978,6 +5072,14 @@ function rowTint(row: Row): string | undefined {
 function paintCellStyle({ row, column }: { row: Row; column: any }) {
   const key = String(column?.property || '')
   if (!key) return {}
+  // 手动上色优先级最高：勾选行点过的颜色盖过自动底色与旧条件规则。
+  const manual = manualFills.value[recordKey(row)]
+  if (manual) {
+    return {
+      backgroundColor: manual,
+      ...(columnTextColors.value[key] ? { color: columnTextColors.value[key] } : {}),
+    }
+  }
   const statusColor = rowTint(row)
   // 客服工作台：条件填色一律按「整行」算（用户 2026-11-24）。
   // 以前配成「单元格」的规则也跟着整行上色，不用逐条改。
@@ -9298,5 +9400,29 @@ onUnmounted(() => {
 .wb-table :deep(.ant-table-body)::-webkit-scrollbar-thumb:hover,
 .wb-table :deep(.ant-table-content)::-webkit-scrollbar-thumb:hover {
   background: hsl(35 10% 55%);
+}
+.wb-fill-panel {
+  padding: 2px 0;
+}
+.wb-fill-tip {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: hsl(34 9% 44%);
+}
+.wb-fill-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+.wb-fill-dot {
+  width: 100%;
+  height: 26px;
+  border: 1px solid hsl(35 12% 78%);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.wb-fill-dot:hover {
+  border-color: hsl(190 64% 26%);
 }
 </style>
